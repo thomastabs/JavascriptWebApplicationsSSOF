@@ -1,3 +1,8 @@
+# Developed in a group:
+ - Tomás dos Santos Taborda --> ist1103641
+ - Diogo Jorge Taveira Andrade Loureiro Cadete --> ist1102477
+ - João Amadeu Ferreira dos Santos --> ist198943
+
 ## 1\. Aims of this project
 
 - To achieve an in-depth understanding of a security [problem](#2-problem).
