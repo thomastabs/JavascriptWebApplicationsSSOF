@@ -1,0 +1,79 @@
+[
+    {
+        "vulnerability": "DOM XSS",
+        "sources": ["document.referrer", "document.URL", "document.location"],
+        "sanitizers": ["DOMPurify.sanitize", "escapeHTML"],
+        "sinks": ["document.write", "innerHTML", "outerHTML", "setAttribute"],
+        "implicit": "yes"
+    },
+    {
+        "vulnerability": "Stored/Reflected XSS",
+        "sources": ["req.query", "req.body", "req.params", "req.headers"],
+        "sanitizers": ["sanitizeInput", "escapeHTML"],
+        "sinks": ["res.send", "res.write", "res.end", "setAttribute"],
+        "implicit": "yes"
+    },
+    {
+        "vulnerability": "SQL Injection",
+        "sources": ["req.query", "req.body", "req.params"],
+        "sanitizers": ["escape", "mysql.escape", "sequelize.escape"],
+        "sinks": ["db.query", "db.execute", "sequelize.query", "connection.query"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Command Injection",
+        "sources": ["req.query", "req.body", "req.params", "req.headers", "readFile"],
+        "sanitizers": ["shell-escape"],
+        "sinks": ["exec", "execSync", "spawn", "spawnSync", "execFile", "execFileSync"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Path Traversal",
+        "sources": ["req.query", "req.body", "req.params", "req.headers"],
+        "sanitizers": ["path.normalize", "sanitizePath"],
+        "sinks": ["fs.readFile", "fs.readFileSync", "fs.createReadStream"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Insecure Deserialization",
+        "sources": ["req.body", "req.query", "req.params"],
+        "sanitizers": ["safeParse", "JSON.parseSafe"],
+        "sinks": ["eval", "Function", "vm.runInContext", "vm.runInNewContext"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Open Redirect",
+        "sources": ["req.query", "req.body", "req.params"],
+        "sanitizers": ["validateURL", "url.parse"],
+        "sinks": ["res.redirect", "location.assign", "window.location"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "File Upload Vulnerability",
+        "sources": ["req.files", "req.body.file", "req.body.image"],
+        "sanitizers": ["validateFileType", "fileTypeCheck"],
+        "sinks": ["fs.writeFile", "fs.writeFileSync", "fs.createWriteStream"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Server-Side Request Forgery (SSRF)",
+        "sources": ["req.query", "req.body", "req.params"],
+        "sanitizers": ["validateURL", "sanitizeInput"],
+        "sinks": ["http.request", "https.request", "axios", "fetch"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Prototype Pollution",
+        "sources": ["req.body", "req.query", "req.params"],
+        "sanitizers": ["safeAssign", "deepClone"],
+        "sinks": ["Object.assign", "Object.setPrototypeOf", "_.merge", "_.set"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "NoSQL Injection",
+        "sources": ["req.query", "req.body", "req.params"],
+        "sanitizers": ["mongoSanitize", "validateInput"],
+        "sinks": ["db.find", "db.findOne", "db.update", "db.delete"],
+        "implicit": "no"
+    }
+]
