@@ -17,22 +17,22 @@ class Label:
         self.sources: Set[Tuple[str, int]] = set() # Initialize with an empty set of tuples (source, lineofcode)
         self.sanitizers: Dict[str, Set[str]] = dict()  # Initialize with an empty dictionary of sources to sanitizers
     
-    def get_sources(self):
+    def get_sources(self) -> Set[Tuple[str, int]]:
         return self.sources     
     
-    def add_source(self, source, lineofcode):
+    def add_source(self, source, lineofcode) -> None:
         if source not in self.sources:
             self.sources.add([source, lineofcode])
             self.sanitizers[source] = set()  # Initialize with an empty sanitizer set
 
-    def add_sanitizer(self, source, sanitizer):
+    def add_sanitizer(self, source, sanitizer) -> None:
         if source in self.sources:
             self.sanitizers[source].add(sanitizer)
 
-    def get_sanitizers(self):
+    def get_sanitizers(self) -> Dict[str, Set[str]]:
         return {src: sanitizers.copy() for src, sanitizers in self.sanitizers.items()}
 
-    def combine(self, other):
+    def combine(self, other) -> 'Label':
         combined_sources = self.sources.union(other.sources)
         combined_sanitizers = {}
 

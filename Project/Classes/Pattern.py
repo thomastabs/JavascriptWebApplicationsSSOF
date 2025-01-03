@@ -22,28 +22,28 @@ class Pattern:
         self.sinks = sinks # Use sets for faster lookup
         self.implicit = implicit # Flag for implicit 
 
-    def get_name(self):
+    def get_name(self) -> str:
         return self.name
 
-    def get_sources(self):
+    def get_sources(self) -> List[str]:
         return list(self.sources)
 
-    def get_sanitizers(self):
+    def get_sanitizers(self) -> List[str]:
         return list(self.sanitizers)
 
-    def get_sinks(self):
+    def get_sinks(self) -> List[str]:
         return list(self.sinks)
     
-    def get_implicit(self):
+    def get_implicit(self) -> bool:
         return self.implicit
 
-    def is_source(self, name):
+    def is_source(self, name) -> bool:
         return name in self.sources
 
-    def is_sanitizer(self, name):
+    def is_sanitizer(self, name) -> bool:
         return name in self.sanitizers
 
-    def is_sink(self, name):
+    def is_sink(self, name) -> bool:
         return name in self.sinks
     
 
