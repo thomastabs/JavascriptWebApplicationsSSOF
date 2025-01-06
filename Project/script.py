@@ -100,34 +100,33 @@ patterns = [
 ]
 
 
-def analyze_ast(ast_dict, patterns):
-    results = []
-    # Perform static analysis logic
-    for pattern in patterns:
-        vulnerability = pattern["vulnerability"]
-        sources = pattern["sources"]
-        sinks = pattern["sinks"]
-        sanitizers = pattern["sanitizers"]
-        implicit_flag = pattern["implicit"]
-        
-        # Traverse AST to find matches
-        # Example logic for source-to-sink detection
-        for source in sources:
-            for sink in sinks:
-                # Check flow and sanitization here
-                # Append results to 'results'
-                pass
-    return results
+def traverse_ast(node, depth=0):
+    indent = "  " * depth
+
+    if isinstance(node, dict):
+        node_type = node.get("type", "Unknown")
+        line = node.get("loc", {}).get("start", {}).get("line", "Unknown")
+        print(f"{indent}Node Type: {node_type}, Line: {line}")
+
+        # Recursively traverse child nodes
+        for key, value in node.items():
+            if isinstance(value, (dict, list)):
+                traverse_ast(value, depth + 1)
+
+    elif isinstance(node, list):
+        for child in node:
+            traverse_ast(child, depth)
+
 
 
 
 # Load inputs
-ast_dict = esprima.parseScript(program, loc = True).toDict()
+ast_dict = esprima.parseScript(program, loc=True).toDict()
 ast_json = json.dumps(ast_dict, indent=2)
 
 
-# Analyze AST
-results = analyze_ast(ast_dict, patterns)
+# Traverse the AST and print node types and starting line numbers
+traverse_ast(ast_json)
 
 
 
