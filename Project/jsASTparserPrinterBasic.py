@@ -6,7 +6,7 @@ var pos = document.URL.indexOf("name=");
 var name = document.URL.substring(pos + 5);
 document.write(name);
 '''
-
+ 
 def traverse_ast(node, indent_level=0):
     # Create an indentation string based on the level
     indent = '  ' * indent_level
