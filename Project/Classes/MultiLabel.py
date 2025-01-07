@@ -28,13 +28,11 @@ class MultiLabel:
         self.mapping[pattern] = label
 
     def combine(self, other: "MultiLabel") -> "MultiLabel":
-        print(f"Combining MultiLabels:\nSelf: {self.mapping}\nOther: {other.mapping}")
         combined_mapping = {}
         patterns = self.get_patterns().union(other.get_patterns())
         for pattern in patterns:
             combined_mapping[pattern] = self.get_label(pattern).combine(other.get_label(pattern))
         combined = MultiLabel(combined_mapping)
-        print(f"Result of Combination: {combined.mapping}")
         return combined
 
     def to_json(self) -> Dict:

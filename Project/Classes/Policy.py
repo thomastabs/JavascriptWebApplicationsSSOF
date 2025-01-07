@@ -31,9 +31,7 @@ class Policy:
             return set(self.patterns[name].get_sinks())
         return set()
 
-    def detect_illegal_flows(self, sink_name, multilabel: MultiLabel) -> MultiLabel:
-        print(f"Detecting flows for sink: {sink_name}, MultiLabel: {multilabel.mapping}")
-    
+    def detect_illegal_flows(self, sink_name, multilabel: MultiLabel) -> MultiLabel:    
         illegal_flows = {}
 
         for pattern_name, label in multilabel.mapping.items():

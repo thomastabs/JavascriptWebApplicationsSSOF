@@ -31,6 +31,31 @@ class Vulnerabilities:
     def get_vulnerabilities(self) -> Dict[str, List[Dict]]:
         return self.illegal_flows
 
+    def generate_output(self) -> list:
+        output = []
+        for sink, flows in self.illegal_flows.items():
+            for flow in flows:
+                sanitized_flows = [
+                    [[sanitizer, line] for sanitizer, line in label.get_sanitizers().items()]
+                    for label in flow.get('sanitizers', {}).values()
+                ]
+                sanitized_flows = sanitized_flows if sanitized_flows else "none"
+
+                output.append({
+                    "vulnerability": flow["pattern"],
+                    "source": list(flow["sources"])[0],  # Assuming one source per flow
+                    "sink": [sink, flow.get("line", "Unknown")],
+                    "implicit_flows": "yes" if flow.get("implicit", False) else "no",
+                    "unsanitized_flows": "yes" if not sanitized_flows else "no",
+                    "sanitized_flows": sanitized_flows
+                })
+        return output
+
+    def save_output_to_file(self, output_path: str):
+        vulnerabilities_output = self.generate_output()
+        with open(output_path, "w") as output_file:
+            json.dump(vulnerabilities_output, output_file, indent=2)
+
     def to_json(self) -> Dict:
         return {
             sink: [
