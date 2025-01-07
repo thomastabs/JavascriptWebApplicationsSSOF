@@ -49,7 +49,7 @@ class Pattern:
 
     @classmethod
     def from_json(cls, json_data):
-        name = json_data["name"]
+        name = json_data["vulnerability"]
         sources =  {source for source in json_data["sources"]}
         sinks = {sink for sink in json_data["sinks"]}
         sanitizers = {sanitizer for sanitizer in json_data.get("sanitizers", [])}

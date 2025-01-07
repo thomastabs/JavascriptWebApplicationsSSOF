@@ -41,7 +41,10 @@ class Label:
                 other.sanitizers.get(src, set())
             )
 
-        return Label(combined_sources, combined_sanitizers)
+        combined_label = Label()
+        combined_label.sources = combined_sources
+        combined_label.sanitizers = combined_sanitizers
+        return combined_label 
 
     def to_json(self):
         return {

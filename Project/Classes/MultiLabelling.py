@@ -1,5 +1,8 @@
 from typing import Dict
-from MultiLabel import MultiLabel
+from typing import Set
+from Classes.MultiLabel import MultiLabel
+from Classes.Pattern import Pattern
+import Classes.Policy as policy
 import json
 import copy
 
@@ -12,7 +15,20 @@ class MultiLabelling:
         self.mapping: Dict[str, MultiLabel] = {}
 
     def get_multilabel(self, var_name: str) -> MultiLabel:
-        return self.mapping.get(var_name, MultiLabel())
+        if not self.has_multi_label(var_name):
+            return MultiLabel()
+        return self.mapping[var_name]
+    
+    def get_multilabels(self) -> Set[MultiLabel]:
+        return set(self.mapping.values())
+    
+    def get_patterns(self) -> Set[Pattern]:
+        return set.union(
+            *[multi_label.get_patterns() for multi_label in self.get_multilabels()]
+        )
+    
+    def has_multi_label(self, var_name: str) -> bool:
+        return var_name in self.mapping
 
     def update_multilabel(self, var_name: str, multilabel: MultiLabel) -> None:
         self.mapping[var_name] = multilabel
@@ -22,24 +38,16 @@ class MultiLabelling:
         new_instance.mapping = {name: copy.deepcopy(multilabel) for name, multilabel in self.mapping.items()}
         return new_instance
 
-    def combinor(self, other: "MultiLabelling") -> "MultiLabelling":
-        new_instance = MultiLabelling()
+    def combine(self, other: "MultiLabel") -> "MultiLabel":
+        combined_mapping = {}
+        patterns = self.get_patterns().union(other.get_patterns())
+        for pattern in patterns:
+            combined_label = self.get_label(pattern).combine(other.get_label(pattern))
+            combined_mapping[pattern] = combined_label
+        combined = MultiLabel(combined_mapping)
+        print(f"Result of Combination: {combined.mapping}")
+        return combined
 
-        # Combine keys from both mappings
-        all_keys = set(self.mapping.keys()).union(set(other.mapping.keys()))
-
-        for key in all_keys:
-            # Get MultiLabel objects for the current key from both mappings
-            self_label = self.get_multilabel(key)
-            other_label = other.get_multilabel(key)
-
-            # Combine the MultiLabel objects
-            combined_label = self_label.combine_with(other_label)
-
-            # Update the new mapping
-            new_instance.update_multilabel(key, combined_label)
-
-        return new_instance
     
     def to_json(self):
         return {

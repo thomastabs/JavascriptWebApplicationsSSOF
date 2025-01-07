@@ -1,12 +1,14 @@
-from .Label import Label
-from .Pattern import Pattern
+import json
 
-from typing import Dict, List
+from typing import Dict, Set
+from Classes.Label import Label
+from Classes.Pattern import Pattern
+
 
 class MultiLabel:
     """
-    Generalized Label class to represent distinct labels corresponding to different patterns.
-    Each pattern has a corresponding Label object to track sources and sanitizers.
+    Generalizes the Label class in order to be able to represent distinct labels
+    corresponding to different patterns.
     """
 
     def __init__(self, mapping=None) -> None:
@@ -14,31 +16,34 @@ class MultiLabel:
             mapping = {}
         self.mapping = mapping
 
-    def get_label(self, pattern: Pattern):
+    def get_patterns(self) -> Set[Pattern]:
+        return set(self.mapping.keys())
+
+    def get_label(self, pattern: Pattern) -> Label:
         if pattern not in self.mapping:
             return Label()
         return self.mapping[pattern]
 
-    def get_patterns(self):
-        return set(self.mapping.keys())
+    def add_label(self, label: Label, pattern: Pattern) -> None:
+        self.mapping[pattern] = label
 
-    def add_label(self, label: Label, pattern: Pattern):
-        self.mapping[pattern].append(label)
-
-    def combine(self, other):
-        combined_mapping = self.mapping.copy()
+    def combine(self, other: "MultiLabel") -> "MultiLabel":
+        print(f"Combining MultiLabels:\nSelf: {self.mapping}\nOther: {other.mapping}")
+        combined_mapping = {}
         patterns = self.get_patterns().union(other.get_patterns())
-
         for pattern in patterns:
-            label = self.get_label(pattern).combine(other.get_label(pattern))
-            combined_mapping[pattern] = label
-            
-        return MultiLabel(combined_mapping)
-    
-    def to_json(self):
+            combined_mapping[pattern] = self.get_label(pattern).combine(other.get_label(pattern))
+        combined = MultiLabel(combined_mapping)
+        print(f"Result of Combination: {combined.mapping}")
+        return combined
+
+    def to_json(self) -> Dict:
         return {
             "mapping": [
                 (pattern.to_json(), label.to_json())
                 for pattern, label in self.mapping.items()
             ]
-        }        
+        }
+
+    def __repr__(self) -> str:
+        return json.dumps(self.to_json(), indent=2)

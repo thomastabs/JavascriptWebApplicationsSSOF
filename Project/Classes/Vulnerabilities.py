@@ -1,6 +1,6 @@
 from typing import Dict, List
-from MultiLabel import MultiLabel
-from Policy import Policy
+from Classes.MultiLabel import MultiLabel
+from Classes.Policy import Policy
 import json
 
 class Vulnerabilities:

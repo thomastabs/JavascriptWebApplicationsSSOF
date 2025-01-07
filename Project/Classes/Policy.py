@@ -1,7 +1,7 @@
 from typing import List, Dict, Set
-from MultiLabel import MultiLabel  # Assuming MultiLabel is defined elsewhere
-from Label import Label
-from Pattern import Pattern
+from Classes.MultiLabel import MultiLabel  
+from Classes.Label import Label
+from Classes.Pattern import Pattern
 import json
 
 
@@ -32,6 +32,8 @@ class Policy:
         return set()
 
     def detect_illegal_flows(self, sink_name, multilabel: MultiLabel) -> MultiLabel:
+        print(f"Detecting flows for sink: {sink_name}, MultiLabel: {multilabel.mapping}")
+    
         illegal_flows = {}
 
         for pattern_name, label in multilabel.mapping.items():
@@ -47,7 +49,9 @@ class Policy:
                         illegal_sources.add(source)
 
                 if illegal_sources:
-                    illegal_flows[pattern_name] = Label(illegal_sources, label.get_sanitizers())
+                    illegal_flows[pattern_name] = Label()
+                    illegal_flows[pattern_name].sources = illegal_sources
+                    illegal_flows[pattern_name].sanitizers = label.get_sanitizers()
 
         return MultiLabel(illegal_flows)
 
