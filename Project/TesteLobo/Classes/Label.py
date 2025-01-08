@@ -5,10 +5,6 @@ import json
 from typing import Dict, Set, Tuple
 from Classes.Flow import Flow
 
-from Classes.Sanitizer import Sanitizer
-from Classes.Source import Source
-
-
 class Label:
     """
     Represents the integrity of information that is carried by a resource.
@@ -19,44 +15,37 @@ class Label:
     """
 
     def __init__(self) -> None:
-        self.sources: Set[Tuple[Source, int]] = set()
-        self.flows: Dict[Source, Set[Flow]] = dict()
+        self.sources: Set[Tuple[str, int]] = set()
+        self.flows: Dict[str, Set[Flow]] = dict()
 
-    def get_sources(self) -> Set[Tuple[Source, int]]:
+
+    def get_sources(self) -> Set[Tuple[str, int]]:
         return self.sources
 
-    def add_source(self, source: Source, lineno: int) -> None:
+    def add_source(self, source: str, lineno: int):
         print(f"Adding source: {source} at line {lineno}")
+        if source in self.sources:
+            print(f"Warning: Source '{source}' already exists in the label.")
+            return
         self.sources.add((source, lineno))
         if source not in self.flows:
             flow = Flow()
             self.flows[source] = {flow}
-            print(f"Initialized flow for source {source}: {flow}")
 
-
-    def get_flows_from_source(self, source: Source) -> Set[Flow]:
+    def get_flows_from_source(self, source: str) -> Set[Flow]:
         if source not in self.flows:
-            print(f"No flows found for source: {source}, initializing a new flow.")
-            self.flows[source] = {Flow()}
+            return set()
         return self.flows[source]
 
-
-
-    def add_sanitizer(self, sanitizer: Sanitizer, lineno: int, source: Source) -> None:
-        print(f"Adding sanitizer: {sanitizer} at line {lineno} for source: {source}")
+    def add_sanitizer(self, sanitizer: str, lineno: int, source: str) -> None:
         if source not in self.flows:
-            self.flows[source] = {Flow()}
+            flow = Flow()
+            self.flows[source] = {flow}
+
         for flow in self.flows[source]:
             flow.add_sanitizer(sanitizer, lineno)
-            print(f"Updated flow for source {source}: {flow}")
-
-
 
     def combine(self, other: "Label") -> "Label":
-        """
-        Return a new Label with the union of the sources and sanitizers of the
-        two labels.
-        """
         combined_sources = self.sources.union(other.sources)
         combined_flows = {}
 

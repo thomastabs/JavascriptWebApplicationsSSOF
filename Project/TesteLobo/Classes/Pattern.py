@@ -2,64 +2,59 @@ import json
 
 from typing import Dict, Set
 
-from Classes.Sanitizer import Sanitizer
-from Classes.Sink import Sink
-from Classes.Source import Source
-from Classes.Vulnerability import Vulnerability
-
 
 class Pattern:
     def __init__(
         self,
-        vulnerability: Vulnerability,
-        sources: Set[Source],
-        sanitizers: Set[Sanitizer],
-        sinks: Set[Sink],
-        implicit: bool,
+        name: str,
+        sources: Set[str],
+        sanitizers: Set[str],
+        sinks: Set[str]
     ) -> None:
-        self.vulnerability = vulnerability
+        self.name = name
         self.sources = sources
         self.sanitizers = sanitizers
         self.sinks = sinks
-        self.implicit = implicit
+        self.implicit = False
 
-    def get_vulnerability(self) -> Vulnerability:
-        return self.vulnerability
+    def get_vulnerability(self) -> str:
+        return self.name
 
-    def get_sources(self) -> Set[Source]:
+    def get_sources(self) -> Set[str]:
         return self.sources
+    
+    def get_sanitizers(self) -> Set[str]:
+        return self.sanitizers
 
-    def has_source(self, source: Source) -> bool:
+    def has_source(self, source: str) -> bool:
         return source in self.sources
 
-    def has_sanitizer(self, sanitizer: Sanitizer) -> bool:
+    def has_sanitizer(self, sanitizer: str) -> bool:
         return sanitizer in self.sanitizers
 
-    def has_sink(self, sink: Sink) -> bool:
+    def has_sink(self, sink: str) -> bool:
         return sink in self.sinks
 
     def consider_implicit(self) -> bool:
         return self.implicit
 
-    @classmethod
-    def from_json(cls, json_data) -> "Pattern":
-        vulnerability = Vulnerability(json_data["vulnerability"])
-        sources = {Source(source) for source in json_data["sources"]}
-        sinks = {Sink(sink) for sink in json_data["sinks"]}
-        sanitizers = {
-            Sanitizer(sanitizer) for sanitizer in json_data.get("sanitizers", [])
-        }
-        implicit = json_data.get("implicit", False)
-
-        return cls(vulnerability, sources, sanitizers, sinks, implicit)
+    def testString(self, string):
+        if string in self.sources:
+            return "source"
+        elif string in self.sanitizers:
+            return "sanitizer"
+        elif string in self.sinks:
+            return "sink"
+        else:
+            return "none"
 
     def to_json(self) -> Dict:
         return {
-            "vulnerability": self.vulnerability,
+            "vulnerability": self.name,
             "sources": [source for source in self.sources],
             "sanitizers": [sanitizer for sanitizer in self.sanitizers],
             "sinks": [sink for sink in self.sinks],
-            "implicit": self.implicit,
+            "implicit": self.implicit
         }
 
     def __repr__(self) -> str:

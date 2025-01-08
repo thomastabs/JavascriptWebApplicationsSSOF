@@ -1,14 +1,14 @@
-from Classes.Policy import Policy
-from Classes.Pattern import Pattern
-from Classes.MultiLabelling import MultiLabelling
-from Classes.Vulnerabilities import Vulnerabilities
-from Classes.ASTProcessor import ASTProcessor
 import esprima
 import sys
 import json
 import os
 
-# Usage: python js_analyzer.py <path_to_program.js> <path_to_patterns.json>
+from Classes.Pattern import Pattern
+from Classes.Vulnerabilities import Vulnerabilities
+from Classes.MultiLabelling import MultiLabelling
+from Classes.Policy import Policy
+from Classes.ASTProcessor import ASTProcessor
+       
 
 def main():
     if len(sys.argv) != 3:
@@ -46,11 +46,10 @@ def main():
             patterns_json = json.load(f)
             pattern_objects = [
                 Pattern(
-                    vulnerability=p["vulnerability"],
+                    name=p["vulnerability"],
                     sources=set(p["sources"]),
                     sanitizers=set(p["sanitizers"]),
                     sinks=set(p["sinks"]),
-                    implicit=p["implicit"] == "yes",
                 )
                 for p in patterns_json
             ]
@@ -68,25 +67,26 @@ def main():
     # Initialize MultiLabelling and Vulnerabilities
     multilabelling = MultiLabelling()
     vulnerabilities = Vulnerabilities(policy)
+    multilabelling = MultiLabelling({})
 
-    print(policy)
+    ast_processor = ASTProcessor(policy, multilabelling, vulnerabilities)
+    ast_processor.traverse_ast(ast_dict)
+        
+    # Get illegal flows    
+    illegal_flows = set()  
+    for illegal_flow in vulnerabilities.get_illegal_flows():
+        illegal_flows.add(illegal_flow)
+    illegal_flows = list(illegal_flows)
+        
+    # Transform illegal flows to JSON
+    for i in range(len(illegal_flows)):
+        illegal_flows[i] = illegal_flows[i].to_json()
 
-    # Process the AST
-    try:
-        ast_processor = ASTProcessor(policy, multilabelling, vulnerabilities)
-        ast_processor.traverse_ast(ast_dict)
-        #ast_processor.traverse_ast_printer(ast_dict)
-    except Exception as e:
-        print(f"Error processing AST: {e}", file=sys.stderr)
-        sys.exit(1)
-
-    # Save the output
-    try:
-        ast_processor.save_vulnerabilities_to_file(output_path)
-        print(f"Vulnerabilities saved to {output_path}")
-    except Exception as e:
-        print(f"Error saving output: {e}", file=sys.stderr)
-        sys.exit(1)
+    # Write illegal flows to output file
+    if not os.path.exists("output"):
+        os.makedirs("output")
+    with open(output_path, "w") as f:
+        f.write(json.dumps(illegal_flows, indent=4) + "\n")
 
 if __name__ == "__main__":
     main()

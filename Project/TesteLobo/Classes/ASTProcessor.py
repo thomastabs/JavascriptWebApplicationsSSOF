@@ -2,14 +2,9 @@ from Classes.MultiLabelling import MultiLabelling
 from Classes.MultiLabel import MultiLabel
 from Classes.Policy import Policy
 from Classes.Vulnerabilities import Vulnerabilities
-from Classes.Pattern import Pattern
 from Classes.Label import Label
-from Classes.Variable import Variable
 from Classes.IllegalFlow import IllegalFlow
-from Classes.Flow import Flow
 
-import json
-import sys
 
 class ASTProcessor:
     """
@@ -33,7 +28,7 @@ class ASTProcessor:
         :return: A Label describing the information flow for the given expression.
         """
         if node['type'] == 'Identifier':
-            return self.multilabelling.get_multi_label(node['name'])
+            return self.multilabelling.get_multilabel(node['name'])
         
         elif node['type'] == 'Literal':
             return MultiLabel()
@@ -55,16 +50,16 @@ class ASTProcessor:
                 function_name = callee['name']
                 # Add the source to the MultiLabel
                 for pattern in self.policy.get_patterns():
-                    if pattern.has_source(function_name):
+                    if pattern.testString(function_name) == "source":
                         label = Label()
                         label.add_source(function_name, node['loc']['start']['line'])
                         combined_multi_label.add_label(label, pattern)
 
-                    if pattern.has_sink(function_name):
+                    if pattern.testString(function_name) == "sink":
                         print(f"Sink matched: {function_name}")
-                        for source, _ in combined_multi_label.get_label(pattern).get_sources():
+                        for source, sourceLine in combined_multi_label.get_label(pattern).get_sources():
                             print(f"Checking source: {source}")
-                            if pattern.has_source(source):
+                            if pattern.testString(source) == "source":
                                 unsanitized = not any(
                                     sanitizer in pattern.sanitizers
                                     for sanitizer in combined_multi_label.get_label(pattern).get_flows_from_source(source)
@@ -74,11 +69,12 @@ class ASTProcessor:
                                     illegal_flow = IllegalFlow(
                                         pattern.get_vulnerability(),
                                         source,
-                                        node['loc']['start']['line'],
+                                        sourceLine,
                                         function_name,
                                         node['loc']['end']['line'],
                                         unsanitized,
-                                        list(combined_multi_label.get_label(pattern).get_flows_from_source(source))
+                                        list(combined_multi_label.get_label(pattern).get_flows_from_source(source)),
+                                        False
                                     )
                                     self.vulnerabilities.add_illegal_flow(illegal_flow)
 
@@ -97,7 +93,7 @@ class ASTProcessor:
             variable = node['left']['name']
             value_label = self.process_expression_node(node['right'])
             print(f"Assigning label to {variable}: {value_label}")
-            self.multilabelling.add_multi_label(value_label, variable)
+            self.multilabelling.update_multilabel(variable, value_label)
 
         else:
             return MultiLabel()
@@ -131,43 +127,23 @@ class ASTProcessor:
             
     def traverse_ast(self, ast):
         for stmt in ast['body']:
-            print(f"Processing statement: {stmt}")
             if stmt['type'] == 'ExpressionStatement':
                 self.process_expression_node(stmt['expression'])
 
 
     def traverse_ast_printer(self, node, indent_level=0):
-        # Create an indentation string based on the level
         indent = '  ' * indent_level
 
-        # Check if the node is a dictionary (it should be)
         if isinstance(node, dict) and 'type' in node:
-            # Get the node type and line number (default to "Unknown" if not found)
             node_type = node.get('type', 'Unknown')
-            # Access the 'loc' field to get line number, default to "Unknown"
             line = node.get('loc', {}).get('start', {}).get('line', 'Unknown')
 
-            # Print node type and line number with indentation
             print(f"{indent}Node Type: {node_type}, Line: {line}")
 
-            # Recursively traverse any child nodes
             for key, value in node.items():
-                if isinstance(value, (dict, list)):  # Recurse into dictionaries and lists
+                if isinstance(value, (dict, list)): 
                     self.traverse_ast_printer(value, indent_level + 1)
 
-        # If the node is a list, traverse each element
         elif isinstance(node, list):
             for child in node:
                 self.traverse_ast_printer(child, indent_level + 1)
-
-
-    def save_vulnerabilities_to_file(self, file_path: str):
-        try:
-            serialized_vulnerabilities = self.vulnerabilities.to_json()
-            print(f"Serialized Vulnerabilities: {json.dumps(serialized_vulnerabilities, indent=4)}")
-            with open(file_path, 'w') as f:
-                json.dump(serialized_vulnerabilities, f, indent=4)
-            print(f"Vulnerabilities saved to {file_path}")
-        except Exception as e:
-            print(f"Error saving vulnerabilities to file: {e}", file=sys.stderr)
-            sys.exit(1)

@@ -3,22 +3,18 @@ import json
 from typing import Dict, List
 from Classes.Flow import Flow
 
-from Classes.Vulnerability import Vulnerability
-from Classes.Source import Source
-from Classes.Sink import Sink
-
 
 class IllegalFlow:
     def __init__(
         self,
-        vulnerability: Vulnerability,
-        source: Source,
+        vulnerability: str,
+        source: str,
         source_lineno: int,
-        sink: Sink,
+        sink: str,
         sink_lineno: int,
         unsanitized_flows: bool,
         sanitized_flows: List[Flow],
-        implicit: bool = False,
+        implicit_flow: bool = False
     ) -> None:
         self.vulnerability = vulnerability
         self.source = source
@@ -27,9 +23,9 @@ class IllegalFlow:
         self.sink_lineno = sink_lineno
         self.unsanitized_flows = unsanitized_flows
         self.sanitized_flows = sanitized_flows
-        self.implicit = implicit
+        self.implicit_flow = implicit_flow
 
-    def get_vulnerability(self) -> Vulnerability:
+    def get_vulnerability(self) -> str:
         return self.vulnerability
 
     def is_combinable(self, other) -> bool:
@@ -54,16 +50,18 @@ class IllegalFlow:
         )
 
     def to_json(self) -> Dict:
-        print(f"Sanitized flows before serialization: {self.sanitized_flows}")
         return {
             "vulnerability": str(self.vulnerability),
             "source": [str(self.source), self.source_lineno],
             "sink": [str(self.sink), self.sink_lineno],
             "unsanitized_flows": "yes" if self.unsanitized_flows else "no",
-            "sanitized_flows": [
-                flow.to_json() for flow in self.sanitized_flows if not flow.is_empty()
-            ],
-            "implicit": "yes" if hasattr(self, "implicit") and self.implicit else "no",
+            "sanitized_flows": list(
+                map(
+                    lambda flow: flow.to_json(),
+                    filter(lambda flow: not flow.is_empty(), self.sanitized_flows),
+                )
+            ),
+            "implicit": "yes" if self.implicit_flow else "no",
         }
 
     def __repr__(self) -> str:

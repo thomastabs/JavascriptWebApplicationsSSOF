@@ -12,7 +12,7 @@ class MultiLabel:
     corresponding to different patterns.
     """
 
-    def __init__(self, mapping=None) -> None:
+    def __init__(self, mapping=None):
         if mapping is None:
             mapping = {}
         self.mapping = mapping

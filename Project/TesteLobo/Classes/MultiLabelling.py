@@ -3,8 +3,8 @@ import json
 from typing import Dict, Set
 
 from Classes.MultiLabel import MultiLabel
-from Classes.Variable import Variable
 from Classes.Pattern import Pattern
+import copy
 
 
 class MultiLabelling:
@@ -12,29 +12,37 @@ class MultiLabelling:
     Maps variables to multilabels.
     """
 
-    def __init__(self, mapping: Dict[Variable, MultiLabel] = dict()) -> None:
-        self.mapping = mapping
+    def __init__(self, mapping = None):
+        if mapping is not None:
+            mapping = {}
+        self.mapping = {}
 
-    def has_multi_label(self, name: Variable) -> bool:
+    def has_multi_label(self, name: str) -> bool:
         return name in self.mapping
 
-    def get_multi_label(self, name: Variable) -> MultiLabel:
-        if not self.has_multi_label(name):
+    def get_multilabel(self, var_name):
+        if not self.has_multi_label(var_name):
             return MultiLabel()
-        return self.mapping[name]
+        return self.mapping.get(var_name, MultiLabel())
 
-    def get_multi_labels(self) -> Set[MultiLabel]:
+    def get_multilabels(self) -> Set[MultiLabel]:
         return set(self.mapping.values())
 
-    def add_multi_label(self, multilabel: MultiLabel, name: Variable) -> None:
-        print(f"Adding MultiLabel for {name}: {multilabel}")
-        self.mapping[name] = multilabel
+    def update_multilabel(self, var_name, multilabel):
+        self.mapping[var_name] = multilabel
+    
+    def deep_copy(self):
+        return copy.deepcopy(self)
 
-    def get_patterns(self) -> Set[Pattern]:
-        return set.union(
-            *[multi_label.get_patterns() for multi_label in self.get_multi_labels()]
-        )
-
+    def combine(self, other: "MultiLabelling") -> "MultiLabelling":
+        new_multilabelling = self.deep_copy()
+        for var_name, multilabel in other.mapping.items():
+            if var_name in new_multilabelling.mapping:
+                new_multilabelling.mapping[var_name] = new_multilabelling.mapping[var_name].combine(multilabel)
+            else:
+                new_multilabelling.mapping[var_name] = multilabel
+        return new_multilabelling
+    
     def to_json(self) -> Dict:
         return {
             "mapping": [
