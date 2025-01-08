@@ -15,14 +15,12 @@ import json
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print(
-            "Usage: python3 py-analyser.py <slice>.py <pattern>.json", file=sys.stderr
+            "Usage: python3 py-analyser.py <slice>.js <pattern>.json", file=sys.stderr
         )
         sys.exit(1)
 
     slice_path = sys.argv[1]
     pattern_path = sys.argv[2]
-
-    SLICE_NAME = slice_path.split("/")[-1].split(".")[0]
 
     # Read Javascript slice and generate ast
     tree = None
