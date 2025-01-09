@@ -6,6 +6,20 @@
             2
         ],
         "sink": [
+            "e",
+            5
+        ],
+        "unsanitized_flows": "yes",
+        "sanitized_flows": [],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "A",
+        "source": [
+            "c",
+            4
+        ],
+        "sink": [
             "d",
             4
         ],
@@ -20,36 +34,22 @@
             2
         ],
         "sink": [
-            "e",
-            5
-        ],
-        "unsanitized_flows": "yes",
-        "sanitized_flows": [],
-        "implicit": "no"
-    },
-    {
-        "vulnerability": "A",
-        "source": [
-            "c",
-            3
-        ],
-        "sink": [
-            "e",
-            5
-        ],
-        "unsanitized_flows": "yes",
-        "sanitized_flows": [],
-        "implicit": "no"
-    },
-    {
-        "vulnerability": "A",
-        "source": [
-            "c",
-            3
-        ],
-        "sink": [
             "d",
             4
+        ],
+        "unsanitized_flows": "yes",
+        "sanitized_flows": [],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "A",
+        "source": [
+            "c",
+            4
+        ],
+        "sink": [
+            "e",
+            5
         ],
         "unsanitized_flows": "yes",
         "sanitized_flows": [],

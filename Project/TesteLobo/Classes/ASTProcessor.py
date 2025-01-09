@@ -76,8 +76,8 @@ class ASTProcessor:
                                         source=source,
                                         source_lineno=source_line,
                                         sink=function_name,
-                                        sink_lineno=node['callee']['loc']['start']['line'],  # Correct sink line                                        unsanitized_flows=unsanitized,
-                                        unsanitized_flows="yes",
+                                        sink_lineno=node['callee']['loc']['start']['line'],  # Correct sink line                                        
+                                        unsanitized_flows=unsanitized,
                                         sanitized_flows=list(flows)
                                     )
                                     self.vulnerabilities.add_illegal_flow(illegal_flow)
@@ -97,46 +97,47 @@ class ASTProcessor:
             print(f"Combined labels for MemberExpression: {object_label}, {property_label} -> {combined_label}")
             return combined_label
 
+        
         elif node['type'] == 'AssignmentExpression':
-            print(f"Processing AssignmentExpression: {node}")
-            variable = node['left']['name']
-            value_label = self.process_expression_node(node['right'])
+            left_variable = node['left']['name']
+            if node['right']['type'] == 'Identifier':
+                right_variable = node['right']['name']
 
-            # Check if the variable is a sink
+            left_label = self.process_expression_node(node['left'])
+            right_label = self.process_expression_node(node['right'])
+            value_label = left_label.combine(right_label)
+            self.multilabelling.update_multilabel(left_variable, value_label)
+
             for pattern in self.policy.get_patterns():
-                if pattern.has_sink(variable):
+                # Check if the left variable is a sink
+                if pattern.has_sink(left_variable):
                     for source, source_line in value_label.get_label(pattern).get_sources():
-                        if pattern.test_string(source) == "source":
-                            # Check if the flow from the source is unsanitized
+                        if pattern.has_source(source):
+                            # Check unsanitized flows
                             flows = value_label.get_label(pattern).get_flows_from_source(source)
-                            unsanitized = not any(sanitizer in pattern.sanitizers for sanitizer in flows)
+                            unsanitized = not any(
+                                sanitizer in pattern.sanitizers for sanitizer in flows
+                            )
+                            print(f"DEBUG: Source '{source}', Flows: {flows}, Unsanitized: {unsanitized}")
 
                             if unsanitized:
-                                # Create and add an illegal flow
                                 illegal_flow = IllegalFlow(
                                     vulnerability=pattern.get_vulnerability(),
                                     source=source,
                                     source_lineno=source_line,
-                                    sink=variable,
-                                    sink_lineno=node['loc']['start']['line'],  # Ensure the correct line for the sink
-                                    unsanitized_flows=unsanitized,
-                                    sanitized_flows=list(flows)
+                                    sink=left_variable,
+                                    sink_lineno=node['loc']['start']['line'],
+                                    unsanitized_flows="yes",
+                                    sanitized_flows=list(flows),
                                 )
                                 self.vulnerabilities.add_illegal_flow(illegal_flow)
-                                print(f"Illegal flow detected: {illegal_flow}")
 
-            # Update the label for the assigned variable
-            print(f"Assigning label to variable '{variable}': {value_label}")
-            self.multilabelling.update_multilabel(variable, value_label)
+                # Propagate sources from right to left
+                if node['right']['type'] == 'Identifier' and pattern.has_source(right_variable):
+                    illegal_flow = IllegalFlow(pattern.get_vulnerability(), right_variable, node['loc']['start']['line'], left_variable, node['loc']['start']['line'], unsanitized, list(value_label.get_label(pattern).get_flows_from_source(right_variable)), False)
+                    self.vulnerabilities.add_illegal_flow(illegal_flow)
+                    self.multilabelling.get_multilabel(left_variable).get_label(pattern).add_source(right_variable, node['loc']['start']['line'])
 
-            # Treat the left-hand side variable as a new potential source
-            for pattern in self.policy.get_patterns():
-                label = value_label.get_label(pattern)
-                if label.get_sources():
-                    for source, source_line in list(label.get_sources()):  # Use the correct line number from the source
-                        if pattern.test_string(source) == "source":
-                            label.add_source(variable, node['left']['loc']['start']['line'])
-                    print(f"Added new source '{variable}' at line {node['left']['loc']['start']['line']}")            
             return value_label
 
 
