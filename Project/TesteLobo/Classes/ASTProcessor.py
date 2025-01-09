@@ -15,7 +15,14 @@ class ASTProcessor:
         self.policy = policy
         self.multilabelling = multilabelling
         self.vulnerabilities = vulnerabilities
+        self.vulnerability_count = 0  # Counter for vulnerabilities
 
+    def _increment_vulnerability_count(self):
+        """
+        Increment the vulnerability count and return the updated count.
+        """
+        self.vulnerability_count += 1
+        return self.vulnerability_count
 
     def process_expression_node(self, node) -> MultiLabel:
         """
@@ -30,18 +37,25 @@ class ASTProcessor:
             label = self.multilabelling.get_multilabel(node['name'])
             print(f"Identifier '{node['name']}' has label: {label}")
             return label
-            
+
         elif node['type'] == 'Literal':
             print(f"Literal '{node['value']}' encountered. No label assigned.")
             return MultiLabel()
 
         elif node['type'] == 'BinaryExpression':
-            print(f"Processing BinaryExpression: {node}")
             left_label = self.process_expression_node(node['left'])
             right_label = self.process_expression_node(node['right'])
-            combined_label = left_label.combine(right_label)
-            print(f"Combined labels for BinaryExpression: {left_label}, {right_label} -> {combined_label}")
-            return combined_label
+
+            for pattern in self.policy.get_patterns():
+                if node['left']['type'] == 'Identifier':
+                    if pattern.has_source(node['left']['name']):
+                        print(f"Adding source {node['left']['name']} to {pattern.getName()} in left")
+                        left_label.get_label(pattern).add_source(node['left']['name'], node['loc']['start']['line'])
+                if node['right']['type'] == 'Identifier':
+                    if pattern.has_source(node['right']['name']):
+                        print(f"Adding source {node['right']['name']} to {pattern.getName()} in right")
+                        right_label.get_label(pattern).add_source(node['right']['name'], node['loc']['start']['line'])
+            return left_label.combine(right_label)
 
         elif node['type'] == 'CallExpression':
             print(f"Processing CallExpression: {node}")
@@ -60,7 +74,7 @@ class ASTProcessor:
 
                     if match_type == "source":
                         label = Label()
-                        label.add_source(function_name, node['loc']['start']['line'])  # Use correct line for source
+                        label.add_source(function_name, node['loc']['start']['line'])
                         combined_multi_label.add_label(label, pattern)
                         print(f"Source label added for function '{function_name}': {label}")
 
@@ -72,18 +86,17 @@ class ASTProcessor:
 
                                 if unsanitized:
                                     illegal_flow = IllegalFlow(
-                                        vulnerability=pattern.get_vulnerability(),
+                                        vulnerability=f"{pattern.get_vulnerability()}_{self._increment_vulnerability_count()}",
                                         source=source,
                                         source_lineno=source_line,
                                         sink=function_name,
-                                        sink_lineno=node['callee']['loc']['start']['line'],  # Correct sink line                                        
-                                        unsanitized_flows=unsanitized,
+                                        sink_lineno=node['callee']['loc']['start']['line'],
+                                        unsanitized_flows="yes" if unsanitized else "no",
                                         sanitized_flows=list(flows)
                                     )
                                     self.vulnerabilities.add_illegal_flow(illegal_flow)
                                     print(f"Illegal flow detected: {illegal_flow}")
             return combined_multi_label
-
 
         elif node['type'] == 'UnaryExpression':
             print(f"Processing UnaryExpression: {node}")
@@ -97,81 +110,69 @@ class ASTProcessor:
             print(f"Combined labels for MemberExpression: {object_label}, {property_label} -> {combined_label}")
             return combined_label
 
-        
         elif node['type'] == 'AssignmentExpression':
             left_variable = node['left']['name']
             if node['right']['type'] == 'Identifier':
                 right_variable = node['right']['name']
+            else:
+                right_variable = None
 
+            # Process left and right sides
             left_label = self.process_expression_node(node['left'])
             right_label = self.process_expression_node(node['right'])
             value_label = left_label.combine(right_label)
             self.multilabelling.update_multilabel(left_variable, value_label)
 
             for pattern in self.policy.get_patterns():
-                # Check if the left variable is a sink
+                # Handle sinks
                 if pattern.has_sink(left_variable):
                     for source, source_line in value_label.get_label(pattern).get_sources():
                         if pattern.has_source(source):
-                            # Check unsanitized flows
                             flows = value_label.get_label(pattern).get_flows_from_source(source)
                             unsanitized = not any(
                                 sanitizer in pattern.sanitizers for sanitizer in flows
                             )
-                            print(f"DEBUG: Source '{source}', Flows: {flows}, Unsanitized: {unsanitized}")
+                            sanitized_flows = [
+                                sanitizer
+                                for sanitizer in flows
+                                if sanitizer in pattern.sanitizers
+                            ]
+                            illegal_flow = IllegalFlow(
+                                vulnerability=f"{pattern.get_vulnerability()}_{self._increment_vulnerability_count()}",
+                                source=source,
+                                source_lineno=source_line,
+                                sink=left_variable,
+                                sink_lineno=node['loc']['start']['line'],
+                                unsanitized_flows="yes" if unsanitized else "no",
+                                sanitized_flows=sanitized_flows
+                            )
+                            self.vulnerabilities.add_illegal_flow(illegal_flow)
 
-                            if unsanitized:
-                                illegal_flow = IllegalFlow(
-                                    vulnerability=pattern.get_vulnerability(),
-                                    source=source,
-                                    source_lineno=source_line,
-                                    sink=left_variable,
-                                    sink_lineno=node['loc']['start']['line'],
-                                    unsanitized_flows="yes",
-                                    sanitized_flows=list(flows),
-                                )
-                                self.vulnerabilities.add_illegal_flow(illegal_flow)
-
-                # Propagate sources from right to left
-                if node['right']['type'] == 'Identifier' and pattern.has_source(right_variable):
-                    illegal_flow = IllegalFlow(pattern.get_vulnerability(), right_variable, node['loc']['start']['line'], left_variable, node['loc']['start']['line'], unsanitized, list(value_label.get_label(pattern).get_flows_from_source(right_variable)), False)
+                # Propagate sources and sanitizers from right to left
+                if right_variable is not None and pattern.has_source(right_variable):
+                    flows = value_label.get_label(pattern).get_flows_from_source(right_variable)
+                    sanitized_flows = [
+                        sanitizer for sanitizer in flows if sanitizer in pattern.sanitizers
+                    ]
+                    unsanitized = not sanitized_flows
+                    illegal_flow = IllegalFlow(
+                        vulnerability=f"{pattern.get_vulnerability()}_{self._increment_vulnerability_count()}",
+                        source=right_variable,
+                        source_lineno=node['right']['loc']['start']['line'],
+                        sink=left_variable,
+                        sink_lineno=node['left']['loc']['start']['line'],
+                        unsanitized_flows="yes" if unsanitized else "no",
+                        sanitized_flows=sanitized_flows
+                    )
                     self.vulnerabilities.add_illegal_flow(illegal_flow)
                     self.multilabelling.get_multilabel(left_variable).get_label(pattern).add_source(right_variable, node['loc']['start']['line'])
 
             return value_label
 
-
         else:
             print(f"Unhandled expression node type: {node['type']}")
             return MultiLabel()
 
-
-    '''
-    def process_statement_node(self, node):
-        """
-        Processes an AST statement node, updates multilabelling, and checks for vulnerabilities.
-
-        :param node: AST node representing a statement.
-        """
-        if node['type'] == 'ExpressionStatement':
-            self.process_expression_node(node['expression'])
-
-        elif node['type'] == 'VariableDeclaration':
-            for declaration in node['declarations']:
-                variable = Variable(declaration['id']['name'])
-                init_label = self.process_expression_node(declaration['init'])
-                self.multilabelling.add_multi_label(MultiLabel({self.policy: init_label}), variable)
-
-        elif node['type'] == 'IfStatement':
-            self.process_expression_node(node['test'])
-            self.traverse_ast(node['consequent'])
-            if 'alternate' in node and node['alternate']:
-                self.traverse_ast(node['alternate'])
-
-        elif node['type'] == 'BlockStatement':
-            self.traverse_ast(node)
-    '''
-            
     def traverse_ast(self, ast):
         """
         Traverse the AST and process each statement.
@@ -206,9 +207,18 @@ class ASTProcessor:
             print(f"{indent}Node Type: {node_type}, Line: {line}")
 
             for key, value in node.items():
-                if isinstance(value, (dict, list)): 
+                if isinstance(value, (dict, list)):
                     self.traverse_ast_printer(value, indent_level + 1)
 
         elif isinstance(node, list):
             for child in node:
                 self.traverse_ast_printer(child, indent_level + 1)
+
+    def get_sorted_vulnerabilities(self):
+        """
+        Returns the vulnerabilities sorted by their numeric suffix in the vulnerability name.
+        """
+        return sorted(
+            self.vulnerabilities.get_illegal_flows(),
+            key=lambda v: int(v.to_json()["vulnerability"].split("_")[1])
+        )

@@ -8,7 +8,7 @@ from Classes.Vulnerabilities import Vulnerabilities
 from Classes.MultiLabelling import MultiLabelling
 from Classes.Policy import Policy
 from Classes.ASTProcessor import ASTProcessor
-       
+
 
 def main():
     if len(sys.argv) != 3:
@@ -67,26 +67,26 @@ def main():
     # Initialize MultiLabelling and Vulnerabilities
     multilabelling = MultiLabelling()
     vulnerabilities = Vulnerabilities(policy)
-    multilabelling = MultiLabelling({})
 
+    # Process the AST
     ast_processor = ASTProcessor(policy, multilabelling, vulnerabilities)
     ast_processor.traverse_ast(ast_dict)
-        
-    # Get illegal flows    
-    illegal_flows = set()  
-    for illegal_flow in vulnerabilities.get_illegal_flows():
-        illegal_flows.add(illegal_flow)
-    illegal_flows = list(illegal_flows)
-        
-    # Transform illegal flows to JSON
-    for i in range(len(illegal_flows)):
-        illegal_flows[i] = illegal_flows[i].to_json()
 
-    # Write illegal flows to output file
-    if not os.path.exists("output"):
-        os.makedirs("output")
-    with open(output_path, "w") as f:
-        f.write(json.dumps(illegal_flows, indent=4) + "\n")
+    # Get sorted vulnerabilities
+    sorted_vulnerabilities = ast_processor.get_sorted_vulnerabilities()
+
+    # Transform sorted illegal flows to JSON
+    json_illegal_flows = [flow.to_json() for flow in sorted_vulnerabilities]
+
+    # Write sorted illegal flows to output file
+    try:
+        with open(output_path, "w") as f:
+            json.dump(json_illegal_flows, f, indent=4)
+        print(f"Vulnerabilities saved to {output_path}")
+    except Exception as e:
+        print(f"Error saving vulnerabilities: {e}", file=sys.stderr)
+        sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
