@@ -27,17 +27,23 @@ class MultiLabel:
 
     def add_label(self, label: Label, pattern: Pattern) -> None:
         self.mapping[pattern] = label
-
+    
     def combine(self, other: "MultiLabel") -> "MultiLabel":
         new_mapping = {}
         patterns = self.get_patterns().union(other.get_patterns())
 
         for pattern in patterns:
-            new_mapping[pattern] = self.get_label(pattern).combine(
-                other.get_label(pattern)
-            )
+            combined_label = self.get_label(pattern).combine(other.get_label(pattern))
+            new_mapping[pattern] = combined_label
+
+            # Add sources from both labels
+            for source, line in self.get_label(pattern).get_sources():
+                combined_label.add_source(source, line)
+            for source, line in other.get_label(pattern).get_sources():
+                combined_label.add_source(source, line)
 
         return MultiLabel(new_mapping)
+
 
     def to_json(self) -> Dict:
         return {

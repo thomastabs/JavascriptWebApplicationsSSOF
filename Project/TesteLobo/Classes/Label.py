@@ -26,6 +26,7 @@ class Label:
         if source in self.sources:
             return
         self.sources.add((source, lineno))
+        print(f"Added source: {source} at line {lineno}")
         if source not in self.flows:
             flow = Flow()
             self.flows[source] = {flow}

@@ -39,14 +39,17 @@ class Pattern:
         return self.implicit
 
     def test_string(self, string):
+        result = "none"
         if string in self.sources:
-            return "source"
+            result = "source"
         elif string in self.sanitizers:
-            return "sanitizer"
+            result = "sanitizer"
         elif string in self.sinks:
-            return "sink"
-        else:
-            return "none"
+            result = "sink"
+        else: 
+            result = "none"
+        print(f"Testing string '{string}': {result}")
+        return result
 
     def to_json(self) -> Dict:
         return {

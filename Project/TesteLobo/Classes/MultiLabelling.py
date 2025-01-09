@@ -29,6 +29,7 @@ class MultiLabelling:
         return set(self.mapping.values())
 
     def update_multilabel(self, var_name, multilabel):
+        print(f"Updating multilabel for '{var_name}' with: {multilabel}")
         self.mapping[var_name] = multilabel
     
     def deep_copy(self):
@@ -36,9 +37,12 @@ class MultiLabelling:
 
     def combine(self, other: "MultiLabelling") -> "MultiLabelling":
         new_multilabelling = self.deep_copy()
+        print(f"Combining multilabels: {self.mapping} and {other.mapping}")
         for var_name, multilabel in other.mapping.items():
             if var_name in new_multilabelling.mapping:
-                new_multilabelling.mapping[var_name] = new_multilabelling.mapping[var_name].combine(multilabel)
+                new_label = new_multilabelling.mapping[var_name].combine(multilabel)
+                print(f"Combined label for '{var_name}': {new_label}")
+                new_multilabelling.mapping[var_name] = new_label
             else:
                 new_multilabelling.mapping[var_name] = multilabel
         return new_multilabelling
