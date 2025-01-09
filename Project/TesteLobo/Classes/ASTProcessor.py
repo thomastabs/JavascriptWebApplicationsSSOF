@@ -3,7 +3,7 @@ from Classes.MultiLabel import MultiLabel
 from Classes.Policy import Policy
 from Classes.Vulnerabilities import Vulnerabilities
 from Classes.Label import Label
-from Classes.IllegalFlow import IllegalFlow
+from Classes.FlowProcessor import IllegalFlow
 
 
 class ASTProcessor:
@@ -12,9 +12,6 @@ class ASTProcessor:
     """
 
     def __init__(self, policy: Policy, multilabelling: MultiLabelling, vulnerabilities: Vulnerabilities):
-        """
-        Initialize the AST Processor with the policy, multilabelling, and vulnerabilities objects.
-        """
         self.policy = policy
         self.multilabelling = multilabelling
         self.vulnerabilities = vulnerabilities
@@ -48,37 +45,37 @@ class ASTProcessor:
 
             if callee['type'] == 'Identifier':
                 function_name = callee['name']
-                # Add the source to the MultiLabel
+
                 for pattern in self.policy.get_patterns():
-                    if pattern.testString(function_name) == "source":
+                    match_type = pattern.test_string(function_name)
+
+                    if match_type == "source":
+                        # If the function is identified as a source
                         label = Label()
                         label.add_source(function_name, node['loc']['start']['line'])
                         combined_multi_label.add_label(label, pattern)
 
-                    if pattern.testString(function_name) == "sink":
-                        print(f"Sink matched: {function_name}")
-                        for source, sourceLine in combined_multi_label.get_label(pattern).get_sources():
-                            print(f"Checking source: {source}")
-                            if pattern.testString(source) == "source":
-                                unsanitized = not any(
-                                    sanitizer in pattern.sanitizers
-                                    for sanitizer in combined_multi_label.get_label(pattern).get_flows_from_source(source)
-                                )
-                                print(f"Source {source} unsanitized: {unsanitized}")
+                    elif match_type == "sink":
+                        # If the function is identified as a sink
+                        for source, source_line in combined_multi_label.get_label(pattern).get_sources():
+                            if pattern.test_string(source) == "source":
+                                # Check if the flow from the source is unsanitized
+                                flows = combined_multi_label.get_label(pattern).get_flows_from_source(source)
+                                unsanitized = not any(sanitizer in pattern.sanitizers for sanitizer in flows)
+                                
                                 if unsanitized:
+                                    # Create and add an illegal flow
                                     illegal_flow = IllegalFlow(
-                                        pattern.get_vulnerability(),
-                                        source,
-                                        sourceLine,
-                                        function_name,
-                                        node['loc']['end']['line'],
-                                        unsanitized,
-                                        list(combined_multi_label.get_label(pattern).get_flows_from_source(source)),
-                                        False
+                                        vulnerability=pattern.get_vulnerability(),
+                                        source=source,
+                                        source_lineno=source_line,
+                                        sink=function_name,
+                                        sink_lineno=node['loc']['end']['line'],
+                                        unsanitized_flows=unsanitized,
+                                        sanitized_flows=list(flows)
                                     )
                                     self.vulnerabilities.add_illegal_flow(illegal_flow)
-
-            return combined_multi_label
+                    return combined_multi_label
 
 
         elif node['type'] == 'UnaryExpression':
@@ -92,7 +89,6 @@ class ASTProcessor:
         elif node['type'] == 'AssignmentExpression':
             variable = node['left']['name']
             value_label = self.process_expression_node(node['right'])
-            print(f"Assigning label to {variable}: {value_label}")
             self.multilabelling.update_multilabel(variable, value_label)
 
         else:

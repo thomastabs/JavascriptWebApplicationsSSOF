@@ -38,7 +38,7 @@ class Pattern:
     def consider_implicit(self) -> bool:
         return self.implicit
 
-    def testString(self, string):
+    def test_string(self, string):
         if string in self.sources:
             return "source"
         elif string in self.sanitizers:

@@ -3,7 +3,7 @@ from copy import deepcopy
 import json
 
 from typing import Dict, Set, Tuple
-from Classes.Flow import Flow
+from Classes.FlowProcessor import Flow
 
 class Label:
     """
@@ -23,9 +23,7 @@ class Label:
         return self.sources
 
     def add_source(self, source: str, lineno: int):
-        print(f"Adding source: {source} at line {lineno}")
         if source in self.sources:
-            print(f"Warning: Source '{source}' already exists in the label.")
             return
         self.sources.add((source, lineno))
         if source not in self.flows:

@@ -6,7 +6,7 @@ from Classes.MultiLabel import MultiLabel
 from Classes.MultiLabelling import MultiLabelling
 from Classes.Pattern import Pattern
 from Classes.Policy import Policy
-from Classes.IllegalFlow import IllegalFlow
+from Classes.FlowProcessor import IllegalFlow
 
 
 class Vulnerabilities:
