@@ -34,6 +34,7 @@ class Label:
     def get_flows_from_source(self, source: str) -> Set[Flow]:
         if source not in self.flows:
             return set()
+        print(f"Retrieving flows for source '{source}': {self.flows.get(source)}")
         return self.flows[source]
 
     def add_sanitizer(self, sanitizer: str, lineno: int, source: str) -> None:
@@ -43,6 +44,7 @@ class Label:
 
         for flow in self.flows[source]:
             flow.add_sanitizer(sanitizer, lineno)
+            print(f"Updated flow with sanitizer '{sanitizer}': {flow}")
 
     def combine(self, other: "Label") -> "Label":
         combined_sources = self.sources.union(other.sources)

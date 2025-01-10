@@ -7,8 +7,10 @@ class Flow:
     Represents a flow with associated sanitizers and their line numbers.
     """
 
-    def __init__(self, flow: Optional[List[Tuple[str, int]]] = None) -> None:
-        self.flow = flow or []
+    def __init__(self, flow=None) -> None:
+        if flow is None:
+            flow = []
+        self.flow: List[Tuple[str, int]] = flow
 
     def add_sanitizer(self, sanitizer: str, lineno: int) -> None:
         if (sanitizer, lineno) not in self.flow:
@@ -17,8 +19,8 @@ class Flow:
     def is_empty(self) -> bool:
         return not self.flow
 
-    def to_json(self) -> List[Dict[str, int]]:
-        return [{"sanitizer": sanitizer, "line": lineno} for sanitizer, lineno in self.flow]
+    def to_json(self) -> "Flow":
+        return self.flow
 
     def __repr__(self) -> str:
         return json.dumps(self.to_json(), indent=2)
@@ -28,8 +30,8 @@ class Flow:
             return sorted(self.flow) == sorted(other.flow)
         return False
 
-    def __hash__(self) -> int:
-        return hash(tuple(sorted(self.flow)))
+    def __hash__(self):
+        return 0
 
 
 class IllegalFlow:
@@ -84,18 +86,22 @@ class IllegalFlow:
     
     def to_json(self) -> Dict:
         return {
-            "vulnerability": self.vulnerability,
-            "source": [self.source, self.source_lineno],
-            "sink": [self.sink, self.sink_lineno],
+            "vulnerability": str(self.vulnerability),
+            "source": [str(self.source), self.source_lineno],
+            "sink": [str(self.sink), self.sink_lineno],
             "unsanitized_flows": "yes" if self.unsanitized_flows else "no",
-            "sanitized_flows": [
-                flow.to_json() for flow in self.sanitized_flows if not flow.is_empty()
-            ],
+            "sanitized_flows": list(
+                map(
+                    lambda flow: flow.to_json(),
+                    filter(lambda flow: not flow.is_empty(), self.sanitized_flows),
+                )
+            ),
             "implicit": "yes" if self.implicit_flow else "no",
         }
 
     def __repr__(self) -> str:
-        return json.dumps(self.to_json(), indent=2)
+        return json.dumps(self.to_json())
+
 
     def __eq__(self, other) -> bool:
         if isinstance(other, IllegalFlow):
@@ -111,16 +117,5 @@ class IllegalFlow:
             )
         return False
 
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.vulnerability,
-                self.source,
-                self.source_lineno,
-                self.sink,
-                self.sink_lineno,
-                self.unsanitized_flows,
-                tuple(sorted(self.sanitized_flows)),
-                self.implicit_flow,
-            )
-        )
+    def __hash__(self):
+        return 0
