@@ -4,6 +4,7 @@ from Classes.Policy import Policy
 from Classes.Vulnerabilities import Vulnerabilities
 from Classes.Label import Label
 from Classes.FlowProcessor import IllegalFlow
+from typing import Dict
 
 
 class ASTProcessor:
@@ -12,14 +13,110 @@ class ASTProcessor:
     """
 
     def __init__(self, policy: Policy, multilabelling: MultiLabelling, vulnerabilities: Vulnerabilities):
-        self.policy = policy
-        self.multilabelling = multilabelling
-        self.vulnerabilities = vulnerabilities
-        self.vulnerability_count = 0 
+            self.policy = policy
+            self.multilabelling = multilabelling
+            self.vulnerabilities = vulnerabilities
+            self.vulnerability_count = 0
+
+            # Tracking uninitialized variables
+            self.variables = set()
+            self.initialized: Dict[str, int] = dict()
 
     def _increment_vulnerability_count(self):
         self.vulnerability_count += 1
         return self.vulnerability_count
+
+    def is_initialized(self, variable: str, lineno: int) -> bool:
+        if variable in self.initialized:
+            return self.initialized[variable] <= lineno
+        return False
+
+    def is_uninitialized(self, variable: str, lineno: int) -> bool:
+        return not self.is_initialized(variable, lineno)
+
+    def add_initialized(self, variable: str, lineno: int) -> None:
+        if variable not in self.initialized:
+            self.initialized[variable] = lineno
+        self.initialized[variable] = min(self.initialized[variable], lineno)
+
+    def detect_uninitialized_variables(self, ast):
+        # Tracks explicitly initialized variables with their line numbers
+        initialized_variables = {}
+
+        # Tracks uninitialized variables with their line numbers
+        uninitialized_variables = {}
+
+        def traverse_node(node, current_line):
+            if isinstance(node, dict):
+                node_type = node.get('type', '')
+
+                # Handle variable initialization (Assignment or VariableDeclaration)
+                if node_type == 'VariableDeclarator' and 'id' in node:
+                    if node['id']['type'] == 'Identifier':
+                        var_name = node['id']['name']
+                        initialized_variables[var_name] = current_line
+
+                if node_type == 'AssignmentExpression':
+                    left = node.get('left', {})
+                    right = node.get('right', {})
+
+                    # Mark left side as initialized
+                    if left.get('type') == 'Identifier':
+                        initialized_variables[left['name']] = current_line
+
+                    # Traverse right side
+                    traverse_node(right, current_line)
+
+                # Handle function calls
+                if node_type == 'CallExpression':
+                    callee = node.get('callee', {})
+                    args = node.get('arguments', [])
+
+                    # Check the callee
+                    traverse_node(callee, current_line)
+
+                    # Check all arguments
+                    for arg in args:
+                        traverse_node(arg, current_line)
+
+                # Handle binary expressions
+                if node_type == 'BinaryExpression':
+                    traverse_node(node.get('left', {}), current_line)
+                    traverse_node(node.get('right', {}), current_line)
+
+                # Track variables used (uninitialized detection)
+                if node_type == 'Identifier':
+                    var_name = node['name']
+                    if var_name not in initialized_variables:
+                        if var_name not in uninitialized_variables:
+                            uninitialized_variables[var_name] = current_line
+
+                # Recursively traverse child nodes
+                for key, value in node.items():
+                    if isinstance(value, (dict, list)):
+                        traverse_node(value, current_line)
+
+            elif isinstance(node, list):
+                for child in node:
+                    traverse_node(child, current_line)
+
+        # Start traversing the AST
+        for stmt in ast.get('body', []):
+            line_number = stmt.get('loc', {}).get('start', {}).get('line', -1)
+            traverse_node(stmt, line_number)
+
+        # Add all uninitialized variables to every pattern as sources
+        for variable, line in uninitialized_variables.items():
+            print(f"Uninitialized variable detected: {variable} at line {line}")
+            self.variables.add(variable)  
+            for pattern in self.policy.get_patterns():
+                label = self.multilabelling.get_multilabel(variable).get_label(pattern)
+                label.add_source(variable, line)
+                print(f"Uninitialized variable '{variable}' at line {line} added as a source to pattern '{pattern.get_vulnerability()}'.")
+    
+        for pattern in self.policy.get_patterns():
+            print(pattern)
+
 
     def process_expression_node(self, node) -> MultiLabel:
         """
@@ -173,13 +270,15 @@ class ASTProcessor:
 
         else:
             print(f"Unhandled expression node type: {node['type']}")
-            return MultiLabel()
-
+            return MultiLabel()    
+        
+    
     def traverse_ast(self, ast):
         """
         Traverse the AST and process each statement.
         """
         print(f"Starting AST traversal for: {ast}")
+    
         for stmt in ast['body']:
             print(f"Visiting statement: {stmt}")
             if stmt['type'] == 'ExpressionStatement':
@@ -198,6 +297,7 @@ class ASTProcessor:
                 self.process_expression_node(stmt)
             else:
                 print(f"Unhandled statement type: {stmt['type']}")
+
 
     def traverse_ast_printer(self, node, indent_level=0):
         indent = '  ' * indent_level

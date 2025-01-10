@@ -70,6 +70,11 @@ def main():
 
     # Process the AST
     ast_processor = ASTProcessor(policy, multilabelling, vulnerabilities)
+
+    # Search for unititialized variables
+    ast_processor.detect_uninitialized_variables(ast_dict)
+
+    # Traverse the AST
     ast_processor.traverse_ast(ast_dict)
 
     # Get sorted vulnerabilities

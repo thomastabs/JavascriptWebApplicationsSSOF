@@ -43,9 +43,6 @@ class MultiLabel:
                 combined_label.add_source(source, line)
 
         return MultiLabel(new_mapping)
-    
-    
-
 
     def to_json(self) -> Dict:
         return {

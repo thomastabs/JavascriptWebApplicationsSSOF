@@ -27,6 +27,9 @@ class MultiLabelling:
 
     def get_multilabels(self) -> Set[MultiLabel]:
         return set(self.mapping.values())
+    
+    def add_multilabel(self, var_name, multilabel):
+        self.mapping[var_name] = multilabel
 
     def update_multilabel(self, var_name, multilabel):
         print(f"Updating multilabel for '{var_name}' with: {multilabel}")

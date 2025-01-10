@@ -27,10 +27,10 @@ class Vulnerabilities:
         return self.multilabelling.has_multi_label(variable)
 
     def get_multi_label(self, variable: str) -> MultiLabel:
-        return self.multilabelling.get_multi_label(variable)
+        return self.multilabelling.get_multilabel(variable)
 
     def add_multi_label(self, label: MultiLabel, variable: str) -> None:
-        self.multilabelling.add_multi_label(label, variable)
+        self.multilabelling.add_multilabel(label, variable)
 
     def add_illegal_flow(self, illegal_flow: IllegalFlow) -> None:
         self.illegal_flows.add(illegal_flow)
