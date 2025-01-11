@@ -12,10 +12,9 @@ class MultiLabel:
     corresponding to different patterns.
     """
 
-    def __init__(self, mapping=None):
-        if mapping is None:
-            mapping = {}
-        self.mapping = mapping
+    def __init__(self, patterns: Set[Pattern]) -> None:
+        self.patterns = patterns
+        self.mapping = {pattern: Label() for pattern in patterns}
 
     def get_patterns(self) -> Set[Pattern]:
         return set(self.mapping.keys())
@@ -28,19 +27,15 @@ class MultiLabel:
     def add_label(self, label: Label, pattern: Pattern) -> None:
         self.mapping[pattern] = label
     
-    def combine(self, other: "MultiLabel") -> "MultiLabel":
-        new_mapping = {}
-        patterns = self.get_patterns().union(other.get_patterns())
+    def combine(self, other: "MultiLabel") -> "MultiLabel":       
+        multilabel = MultiLabel(self.patterns)
+        for pattern in self.patterns:
+            other_label = other.get_label(pattern)
+            self_label = self.get_label(pattern)
+            combined_label = other_label.combine(self_label)
+            multilabel.add_label(combined_label, pattern)
 
-        for pattern in patterns:
-            combined_label = self.get_label(pattern).combine(other.get_label(pattern))
-            new_mapping[pattern] = combined_label
-
-            # Add sources from both labels
-            for source, line in self.get_label(pattern).get_sources():
-                combined_label.add_source(source, line)
-            for source, line in other.get_label(pattern).get_sources():
-                combined_label.add_source(source, line)
+        return multilabel
 
         return MultiLabel(new_mapping)
 

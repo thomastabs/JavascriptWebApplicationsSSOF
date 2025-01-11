@@ -8,16 +8,15 @@ from Classes.Pattern import Pattern
 from Classes.Policy import Policy
 from Classes.FlowProcessor import IllegalFlow
 
-
 class Vulnerabilities:
     """
     Collects all the illegal information flows discovered during the execution
     of the slice.
     """
 
-    def __init__(self, policy: Policy) -> None:
+    def __init__(self, policy: Policy, multilabelling: MultiLabelling) -> None:
         self.policy = policy
-        self.multilabelling = MultiLabelling()
+        self.multilabelling = multilabelling
         self.illegal_flows: Set[IllegalFlow] = set()
 
     def get_patterns(self) -> Set[Pattern]:

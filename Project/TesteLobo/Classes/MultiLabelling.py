@@ -4,6 +4,7 @@ from typing import Dict, Set
 
 from Classes.MultiLabel import MultiLabel
 from Classes.Pattern import Pattern
+from Classes.Policy import Policy
 import copy
 
 
@@ -12,18 +13,19 @@ class MultiLabelling:
     Maps variables to multilabels.
     """
 
-    def __init__(self, mapping = None):
+    def __init__(self, mapping, policy: Policy) -> None:
         if mapping is not None:
             mapping = {}
         self.mapping = {}
+        self.policy = policy
 
     def has_multi_label(self, name: str) -> bool:
         return name in self.mapping
 
     def get_multilabel(self, var_name):
         if not self.has_multi_label(var_name):
-            return MultiLabel()
-        return self.mapping.get(var_name, MultiLabel())
+            return MultiLabel(self.policy.get_patterns())
+        return self.mapping.get(var_name, MultiLabel(self.policy.get_patterns()))
 
     def get_multilabels(self) -> Set[MultiLabel]:
         return set(self.mapping.values())
@@ -40,12 +42,9 @@ class MultiLabelling:
 
     def combine(self, other: "MultiLabelling") -> "MultiLabelling":
         new_multilabelling = self.deep_copy()
-        print(f"Combining multilabels: {self.mapping} and {other.mapping}")
         for var_name, multilabel in other.mapping.items():
             if var_name in new_multilabelling.mapping:
-                new_label = new_multilabelling.mapping[var_name].combine(multilabel)
-                print(f"Combined label for '{var_name}': {new_label}")
-                new_multilabelling.mapping[var_name] = new_label
+                new_multilabelling.mapping[var_name] = new_multilabelling.mapping[var_name].combine(multilabel)
             else:
                 new_multilabelling.mapping[var_name] = multilabel
         return new_multilabelling

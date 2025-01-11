@@ -12,6 +12,9 @@ class Policy:
     def get_patterns(self) -> Set[Pattern]:
         return self.patterns
 
+    def add_pattern(self, pattern: Pattern) -> None:
+        self.patterns.append(pattern)
+
     def to_json(self) -> Dict:
         return {"patterns": [pattern.to_json() for pattern in self.patterns]}
 

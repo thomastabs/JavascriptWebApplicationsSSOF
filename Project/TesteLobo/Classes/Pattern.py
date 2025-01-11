@@ -25,6 +25,9 @@ class Pattern:
     
     def get_sanitizers(self) -> Set[str]:
         return self.sanitizers
+    
+    def get_sinks(self) -> Set[str]:
+        return self.sinks
 
     def has_source(self, source: str) -> bool:
         return source in self.sources

@@ -65,14 +65,16 @@ def main():
         sys.exit(1)
 
     # Initialize MultiLabelling and Vulnerabilities
-    multilabelling = MultiLabelling()
-    vulnerabilities = Vulnerabilities(policy)
+    multilabelling = MultiLabelling({}, policy)
+    vulnerabilities = Vulnerabilities(policy, multilabelling)
 
     # Process the AST
     ast_processor = ASTProcessor(policy, multilabelling, vulnerabilities)
 
     # Search for unititialized variables
-    ast_processor.detect_uninitialized_variables(ast_dict)
+    # ast_processor.detect_uninitialized_variables(ast_dict)
+
+    print(policy.get_patterns())
 
     # Traverse the AST
     ast_processor.traverse_ast(ast_dict)

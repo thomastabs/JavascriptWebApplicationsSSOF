@@ -44,7 +44,21 @@ class Label:
 
         for flow in self.flows[source]:
             flow.add_sanitizer(sanitizer, lineno)
-            print(f"Updated flow with sanitizer '{sanitizer}': {flow}")
+            print(f"Updated flow with sanitizer '{sanitizer}': {flow}"
+                  )
+
+    def update_source(self, source: str, lineno: int):
+        print(f"Updating source: {source} at line {lineno}")
+        print(f"Current sources: {self.sources}")
+        
+        source_tuple = next((s for s in self.sources if s[0] == source), None)
+    
+        if source_tuple:
+            print(f"Updating source: {source} at line {lineno}")
+            self.sources.remove(source_tuple)
+            self.sources.add((source, lineno))
+        else:
+            print(f"Source '{source}' not found in sources.")       
 
     def combine(self, other: "Label") -> "Label":
         combined_sources = self.sources.union(other.sources)
