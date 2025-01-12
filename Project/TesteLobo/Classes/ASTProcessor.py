@@ -6,6 +6,7 @@ from Classes.Label import Label
 from Classes.FlowProcessor import IllegalFlow
 from Classes.Pattern import Pattern
 from typing import Dict, List
+from Classes.FlowProcessor import Flow
 
 class ASTProcessor:
     """
@@ -69,60 +70,69 @@ class ASTProcessor:
                     right_label.get_label(pattern).add_source(node['right']['name'], node['loc']['start']['line'])
 
             return left_label.combine(right_label)
-
+                
         elif node['type'] == 'CallExpression':
+            print(f"Processing CallExpression: {node}")
             combined_multi_label = MultiLabel(self.policy.get_patterns())
+
+            # Process arguments and combine their labels
             for arg in node['arguments']:
-                multilabel = self.process_expression_node(arg)
-                print(f"Multilabel {arg}: {multilabel}")
-                if not multilabel:
-                    multilabel = MultiLabel(self.policy.get_patterns())
-                combined_multi_label = combined_multi_label.combine(multilabel)
-                print(f"Combined Multilabel: {combined_multi_label}")
-                for pattern in self.policy.get_patterns():
-                    if arg['type'] == 'Identifier':
-                        if pattern.has_source(arg['name']):
-                            print(pattern)
-                            combined_multi_label.get_label(pattern).add_source(arg['name'], arg['loc']['start']['line'])
+                arg_label = self.process_expression_node(arg)
+                if not arg_label:
+                    arg_label = MultiLabel(self.policy.get_patterns())
+                combined_multi_label = combined_multi_label.combine(arg_label)
 
             if node['callee']['type'] == 'Identifier':
                 function_name = node['callee']['name']
+
                 for pattern in self.policy.get_patterns():
+                    # Handle sources
                     if pattern.has_source(function_name):
                         label = Label()
                         label.add_source(function_name, node['loc']['start']['line'])
                         combined_multi_label.add_label(label, pattern)
-                    if pattern.has_sanitizer(function_name):
-                        for source, sourceLine in combined_multi_label.get_label(pattern).get_sources():
-                            combined_multi_label.get_label(pattern).add_sanitizer(function_name, node['loc']['start']['line'], source)
 
+                    # Handle sanitizers
+                    if pattern.has_sanitizer(function_name):
+                        for source, source_line in combined_multi_label.get_label(pattern).get_sources():
+                            combined_multi_label.get_label(pattern).add_sanitizer(
+                                function_name, node['loc']['start']['line'], source
+                            )
+
+                    # Handle sinks
+                    if pattern.has_sink(function_name):
+                        for source, source_line in combined_multi_label.get_label(pattern).get_sources():
+                            flows = combined_multi_label.get_label(pattern).get_flows_from_source(source)
+
+                            # Determine unsanitized and sanitized flows
+                            unsanitized = any(
+                                not any(sanitizer[0] in pattern.sanitizers for sanitizer in flow.flow)
+                                for flow in flows
+                            )
+                            sanitized_flows = [
+                                Flow(flow=[sanitizer for sanitizer in flow.flow if sanitizer[0] in pattern.sanitizers])
+                                for flow in flows
+                            ]
+
+                            count = self._increment_vulnerability_count(pattern.get_vulnerability())
+                            illegal_flow = IllegalFlow(
+                                f"{pattern.get_vulnerability()}_{count}",
+                                source,
+                                source_line,
+                                function_name,
+                                node['loc']['start']['line'],
+                                unsanitized,
+                                sanitized_flows,
+                                False  # Implicit flows are not considered here
+                            )
+                            self.vulnerabilities.add_illegal_flow(illegal_flow)
+                            print(f"Recorded illegal flow: {illegal_flow}")
+
+                # Update multilabels for the function
                 self.multilabelling.update_multilabel(function_name, combined_multi_label)
 
-                for pattern in self.policy.get_patterns():
-                    if pattern.has_sink(function_name):
-                        print(f"Sink matched: {function_name}")
-                        for source, sourceLine in self.multilabelling.get_multilabel(function_name).get_label(pattern).get_sources():
-                            print(f"Checking source: {source}")
-                            unsanitized = not any(
-                                sanitizer in pattern.sanitizers
-                                for sanitizer in combined_multi_label.get_label(pattern).get_flows_from_source(source)
-                            )
-                            print(f"Source {source} unsanitized: {unsanitized}")
-                            if unsanitized:
-                                count = self._increment_vulnerability_count(pattern.get_vulnerability())
-                                illegal_flow = IllegalFlow(
-                                    f"{pattern.get_vulnerability()}_{count}", 
-                                    source, 
-                                    sourceLine, 
-                                    function_name, 
-                                    node['loc']['start']['line'], 
-                                    unsanitized, 
-                                    list(combined_multi_label.get_label(pattern).get_flows_from_source(source)), 
-                                    False
-                                )
-                                self.vulnerabilities.add_illegal_flow(illegal_flow)
-
             return combined_multi_label
+
 
         elif node['type'] == 'UnaryExpression':
             print(f"Processing UnaryExpression: {node}")
@@ -135,89 +145,145 @@ class ASTProcessor:
             combined_label = object_label.combine(property_label)
             print(f"Combined labels for MemberExpression: {object_label}, {property_label} -> {combined_label}")
             return combined_label
-
+        
         elif node['type'] == 'AssignmentExpression':
-            left_node = node['left']
+            left = node['left']['name']
+            print(f"Processing AssignmentExpression: {left} = {node['right']}")
 
-            if left_node['type'] == 'MemberExpression':
-                print("Processing MemberExpression within AssignmentExpression.")
-                left_label = self.process_expression_node(left_node)
-            elif left_node['type'] == 'Identifier':
-                left_label = self.process_expression_node(left_node)
-            else:
-                print(f"Unhandled left node type in AssignmentExpression: {left_node['type']}")
-                return MultiLabel()
-
+            # Process the right-hand side of the assignment
             value_label = self.process_expression_node(node['right'])
 
             if value_label:
-                left = left_node['name'] if left_node['type'] == 'Identifier' else left_node['object']['name']
+                # Update the multilabel for the left-hand side
                 self.multilabelling.update_multilabel(left, value_label)
+                print(f"Updated multilabel for {left}: {value_label}")
 
+                # Check for sinks in the left-hand variable
                 for pattern in self.policy.get_patterns():
                     if pattern.has_sink(left):
-                        print(f"Found sink: {left}")
-                        print(f"Label {value_label.get_label(pattern)}")
-                        for source, sourceLine in self.multilabelling.get_multilabel(left).get_label(pattern).get_sources():
-                            print(f"Checking source: {source}")
-                            unsanitized = not any(
-                                sanitizer in pattern.sanitizers
-                                for sanitizer in value_label.get_label(pattern).get_flows_from_source(source)
+                        print(f"Found sink: {left} for pattern: {pattern.get_vulnerability()}")
+                        label = value_label.get_label(pattern)
+
+                        # Process sources and check for unsanitized flows
+                        for source, source_line in label.get_sources():
+                            print(f"Checking source: {source} for sink: {left}")
+                            flows = label.get_flows_from_source(source)
+
+                            # Determine unsanitized and sanitized flows
+                            unsanitized = any(
+                                not any(sanitizer[0] in pattern.sanitizers for sanitizer in flow.flow)
+                                for flow in flows
                             )
-                            print(f"Source {source} unsanitized: {unsanitized}")
-                            if unsanitized:
-                                count = self._increment_vulnerability_count(pattern.get_vulnerability())
-                                illegal_flow = IllegalFlow(
-                                    f"{pattern.get_vulnerability()}_{count}", 
-                                    source, 
-                                    sourceLine, 
-                                    left_node['type'], 
-                                    node['loc']['start']['line'], 
-                                    unsanitized, 
-                                    list(value_label.get_label(pattern).get_flows_from_source(source)), 
-                                    False
-                                )
-                                self.vulnerabilities.add_illegal_flow(illegal_flow)
-                                print(self.multilabelling.get_multilabel(left).get_label(pattern).get_sources())
+                            sanitized_flows = [
+                                Flow(flow=[sanitizer for sanitizer in flow.flow if sanitizer[0] in pattern.sanitizers])
+                                for flow in flows
+                            ]
+
+                            count = self._increment_vulnerability_count(pattern.get_vulnerability())
+                            illegal_flow = IllegalFlow(
+                                f"{pattern.get_vulnerability()}_{count}",
+                                source,
+                                source_line,
+                                left,
+                                node['loc']['start']['line'],
+                                unsanitized,
+                                sanitized_flows,
+                                False  # Explicit flows only for now
+                            )
+                            self.vulnerabilities.add_illegal_flow(illegal_flow)
+                            print(f"Recorded illegal flow: {illegal_flow}")
             else:
-                multilabel = MultiLabel()
-
-                if left_node['type'] == 'Identifier':
-                    self.multilabelling.update_multilabel(left_node['name'], multilabel)
-                elif left_node['type'] == 'MemberExpression':
-                    member_name = f"{left_node['object']['name']}.{left_node['property']['name']}"
-                    self.multilabelling.update_multilabel(member_name, multilabel)
-
-                left = left_node['name'] if left_node['type'] == 'Identifier' else left_node['object']['name']
+                # Handle uninitialized assignments (empty MultiLabel)
+                print(f"Right-hand side of {left} is uninitialized.")
+                multilabel = MultiLabel(self.policy.get_patterns())
                 self.multilabelling.update_multilabel(left, multilabel)
+                print(f"Initialized empty MultiLabel for {left}")
 
+                # Check for sinks in the left-hand variable
                 for pattern in self.policy.get_patterns():
                     if pattern.has_sink(left):
-                        for source, sourceLine in self.multilabelling.get_multilabel(left).get_label(pattern).get_sources():
-                            print(f"Checking source: {source}")
-                            unsanitized = not any(
-                                sanitizer in pattern.sanitizers
-                                for sanitizer in value_label.get_label(pattern).get_flows_from_source(source)
+                        print(f"Sink detected: {left} for pattern: {pattern.get_vulnerability()}")
+                        label = multilabel.get_label(pattern)
+
+                        # Process sources and check for unsanitized flows
+                        for source, source_line in label.get_sources():
+                            print(f"Checking source: {source} for sink: {left}")
+                            flows = label.get_flows_from_source(source)
+
+                            # Determine unsanitized and sanitized flows
+                            unsanitized = any(
+                                not any(sanitizer[0] in pattern.sanitizers for sanitizer in flow.flow)
+                                for flow in flows
                             )
-                            print(f"Source {source} unsanitized: {unsanitized}")
-                            if unsanitized:
-                                count = self._increment_vulnerability_count(pattern.get_vulnerability())
-                                illegal_flow = IllegalFlow(
-                                    f"{pattern.get_vulnerability()}_{count}", 
-                                    source, 
-                                    sourceLine, 
-                                    left, 
-                                    node['loc']['start']['line'], 
-                                    unsanitized, 
-                                    list(value_label.get_label(pattern).get_flows_from_source(source)), 
-                                    False
-                                )
-                                self.vulnerabilities.add_illegal_flow(illegal_flow)
-                                print(self.multilabelling.get_multilabel(left).get_label(pattern).get_sources())
+                            sanitized_flows = [
+                                Flow(flow=[sanitizer for sanitizer in flow.flow if sanitizer[0] in pattern.sanitizers])
+                                for flow in flows
+                            ]
+
+                            count = self._increment_vulnerability_count(pattern.get_vulnerability())
+                            illegal_flow = IllegalFlow(
+                                f"{pattern.get_vulnerability()}_{count}",
+                                source,
+                                source_line,
+                                left,
+                                node['loc']['start']['line'],
+                                unsanitized,
+                                sanitized_flows,
+                                False
+                            )
+                            self.vulnerabilities.add_illegal_flow(illegal_flow)
+                            print(f"Recorded illegal flow: {illegal_flow}")
+
 
         else:
             print(f"Unhandled expression node type: {node['type']}")
             return MultiLabel()
+
+    '''
+            
+    # Function to process statements
+    def process_statement_node(node, policy: Policy, multilabelling: MultiLabelling, vulnerabilities: Vulnerabilities, max_while_iterations=3):
+        if node['type'] == 'ExpressionStatement':
+            process_expression_node(node['expression'], policy, multilabelling, vulnerabilities)
+            return multilabelling
+        elif node['type'] == 'VariableDeclaration':
+            for decl in node['declarations']:
+                if 'init' in decl:
+                    var_name = decl['id']['name']
+                    label = process_expression_node(decl['init'], policy, multilabelling, vulnerabilities)
+                    print(f"Updating MultiLabel for {var_name} with label: {label}")
+                    multilabelling.update_multilabel(var_name, label)
+            return multilabelling
+        elif node['type'] == 'AssignmentExpression':
+            left_label = process_expression_node(node['left'], policy, multilabelling, vulnerabilities)
+            right_label = process_expression_node(node['right'], policy, multilabelling, vulnerabilities)
+            combined_label = right_label.combine(left_label)
+            if node['left']['type'] == 'Identifier':
+                var_name = node['left']['name']
+                print(f"Updating MultiLabel for variable {var_name}")
+                multilabelling.update_multilabel(var_name, combined_label)
+            return multilabelling
+        elif node['type'] == 'BlockStatement':
+            for stmt in node['body']:
+                multilabelling = process_statement_node(stmt, policy, multilabelling, vulnerabilities)
+            return multilabelling
+        elif node['type'] == 'IfStatement':
+            consequent = process_statement_node(node['consequent'], policy, multilabelling.deep_copy(), vulnerabilities)
+            alternate = multilabelling
+            if node.get('alternate'):
+                alternate = process_statement_node(node['alternate'], policy, multilabelling.deep_copy(), vulnerabilities)
+            return consequent.combinor(alternate)
+        elif node['type'] == 'WhileStatement':
+            loop_label = multilabelling.deep_copy()
+            for _ in range(max_while_iterations):
+                loop_label = process_statement_node(node['body'], policy, loop_label, vulnerabilities)
+                loop_label = multilabelling.combinor(loop_label)
+            return loop_label
+        else:
+            return multilabelling    
+
+        '''
+
 
     def traverse_ast(self, ast):
         """

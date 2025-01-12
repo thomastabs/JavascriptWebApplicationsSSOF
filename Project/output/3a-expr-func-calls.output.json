@@ -9,7 +9,7 @@
             "e",
             2
         ],
-        "unsanitized_flows": "yes",
+        "unsanitized_flows": "no",
         "sanitized_flows": [
             [
                 [
@@ -27,7 +27,7 @@
             1
         ],
         "sink": [
-            "Identifier",
+            "c",
             2
         ],
         "unsanitized_flows": "yes",
@@ -69,10 +69,10 @@
             1
         ],
         "sink": [
-            "Identifier",
+            "c",
             2
         ],
-        "unsanitized_flows": "yes",
+        "unsanitized_flows": "no",
         "sanitized_flows": [
             [
                 [

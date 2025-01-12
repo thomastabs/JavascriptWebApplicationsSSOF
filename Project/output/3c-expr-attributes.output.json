@@ -1,16 +1,1 @@
-[
-    {
-        "vulnerability": "A_1",
-        "source": [
-            "e",
-            1
-        ],
-        "sink": [
-            "MemberExpression",
-            2
-        ],
-        "unsanitized_flows": "yes",
-        "sanitized_flows": [],
-        "implicit": "no"
-    }
-]
+[]

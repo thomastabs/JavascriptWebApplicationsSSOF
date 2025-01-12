@@ -41,19 +41,6 @@ class Pattern:
     def consider_implicit(self) -> bool:
         return self.implicit
 
-    def test_string(self, string):
-        result = "none"
-        if string in self.sources:
-            result = "source"
-        elif string in self.sanitizers:
-            result = "sanitizer"
-        elif string in self.sinks:
-            result = "sink"
-        else: 
-            result = "none"
-        print(f"Testing string '{string}': {result}")
-        return result
-
     def to_json(self) -> Dict:
         return {
             "vulnerability": self.name,
