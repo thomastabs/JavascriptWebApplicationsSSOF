@@ -34,7 +34,6 @@ class MultiLabelling:
         self.mapping[var_name] = multilabel
 
     def update_multilabel(self, var_name, multilabel):
-        print(f"Updating multilabel for '{var_name}' with: {multilabel}")
         self.mapping[var_name] = multilabel
     
     def deep_copy(self):

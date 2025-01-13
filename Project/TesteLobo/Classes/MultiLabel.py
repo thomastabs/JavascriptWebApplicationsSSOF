@@ -37,8 +37,6 @@ class MultiLabel:
 
         return multilabel
 
-        return MultiLabel(new_mapping)
-
     def to_json(self) -> Dict:
         return {
             "mapping": [

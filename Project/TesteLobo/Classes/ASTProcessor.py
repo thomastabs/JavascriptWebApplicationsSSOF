@@ -14,6 +14,14 @@ class ASTProcessor:
     """
 
     def __init__(self, policy: Policy, multilabelling: MultiLabelling, vulnerabilities: Vulnerabilities):
+        """
+        Description: Initializes the ASTProcessor with required components for security analysis.
+        Variables:
+            - policy (Policy): Defines the security patterns and policies to enforce.
+            - multilabelling (MultiLabelling): Tracks variable mappings to multilabels.
+            - vulnerabilities (Vulnerabilities): Collects detected illegal information flows.
+        Result: An instance of ASTProcessor ready for AST traversal and analysis.
+        """
         self.policy = policy
         self.multilabelling = multilabelling
         self.vulnerabilities = vulnerabilities
@@ -22,9 +30,13 @@ class ASTProcessor:
         self.variables = set()
         self.initialized: Dict[str, int] = {}
 
+
     def _increment_vulnerability_count(self, vulnerability_name: str) -> int:
         """
-        Increments the count for a specific vulnerability and returns the new count.
+        Description: Increments the count for a specific vulnerability and returns the updated count.
+        Variables:
+            - vulnerability_name (str): The name of the vulnerability to track.
+        Result: The updated count of the specified vulnerability.
         """
         for entry in self.vulnerability_tracker:
             if entry[0] == vulnerability_name:
@@ -34,7 +46,16 @@ class ASTProcessor:
         self.vulnerability_tracker.append([vulnerability_name, 1])
         return 1
 
+
     def _process_sources_and_sanitizers(self, combined_multi_label, function_name, node):
+        """
+        Description: Processes function calls in the AST to identify sources and sanitizers based on policy patterns.
+        Variables:
+            - combined_multi_label (MultiLabel): The aggregated label for the node.
+            - function_name (str): The name of the function being processed.
+            - node (dict): The AST node representing the function call.
+        Result: Updates the combined_multi_label with sources and sanitizers if applicable.
+        """
         for pattern in self.policy.get_patterns():
             # Handle sources
             if pattern.has_source(function_name):
@@ -51,13 +72,18 @@ class ASTProcessor:
 
 
     def _process_sinks(self, combined_multi_label, var_name, node):
-        print(f"Processing sinks for variable: {var_name} at line {node['loc']['start']['line']}")
+        """
+        Description: Detects illegal flows by analyzing sinks in the AST.
+        Variables:
+            - combined_multi_label (MultiLabel): The label containing information about sources and sanitizers.
+            - var_name (str): The variable name being analyzed as a sink.
+            - node (dict): The AST node representing the sink.
+        Result: Adds detected illegal flows to the vulnerabilities collection.
+        """
         for pattern in self.policy.get_patterns():
             if pattern.has_sink(var_name):
                 for source, source_line in combined_multi_label.get_label(pattern).get_sources():
-                    print(f"Checking source '{source}' for sink '{var_name}'")
                     flows = combined_multi_label.get_label(pattern).get_flows_from_source(source)
-                    print(f"Flows for source '{source}': {flows}")
 
                     unsanitized = any(
                         not any(sanitizer[0] in pattern.sanitizers for sanitizer in flow.flow)
@@ -80,17 +106,20 @@ class ASTProcessor:
                         False
                     )
                     self.vulnerabilities.add_illegal_flow(illegal_flow)
-                    print(f"Recorded illegal flow: {illegal_flow}")
 
 
     def process_expression_node(self, node) -> MultiLabel:
+        """
+        Description: Processes an expression node in the AST and retrieves its security label.
+        Variables:
+            - node (dict): The AST node representing the expression to process.
+        Result: A MultiLabel object containing the security labels for the expression.
+        """
         if node['type'] == 'Identifier':
-            print(f"Processing Identifier: {node['name']}")
 
             if not self.multilabelling.has_multi_label(node['name']):
                 multilabel = MultiLabel(self.policy.get_patterns())
                 for pattern in self.policy.get_patterns():
-                    print(f"Checking pattern {pattern}")
                     label = Label()
                     label.add_source(node['name'], node['loc']['start']['line'])
                     multilabel.add_label(label, pattern)
@@ -98,14 +127,11 @@ class ASTProcessor:
 
             for pattern in self.policy.get_patterns():
                 if pattern.has_source(node['name']):
-                    print(f"Found source in identifier: {node['name']}")
-                    print(f"Pattern: {pattern}")
                     self.multilabelling.get_multilabel(node['name']).get_label(pattern).add_source(node['name'], node['loc']['start']['line'])
 
             return self.multilabelling.get_multilabel(node['name'])
 
         elif node['type'] == 'Literal':
-            print(f"Literal '{node['value']}' encountered. No label assigned.")
             return MultiLabel(self.policy.get_patterns())
 
         elif node['type'] == 'BinaryExpression':
@@ -121,7 +147,6 @@ class ASTProcessor:
             return left_label.combine(right_label)
 
         elif node['type'] == 'CallExpression':
-            print(f"Processing CallExpression: {node}")
             combined_multi_label = MultiLabel(self.policy.get_patterns())
             callee = node['callee']
 
@@ -144,7 +169,6 @@ class ASTProcessor:
                 self._process_sources_and_sanitizers(combined_multi_label, property, node)
 
                 object_label = self.process_expression_node(callee['object'])
-                print(f"Object label: {object_label}")
                 self.multilabelling.get_multilabel(object).combine(object_label)
                 self.multilabelling.get_multilabel(property).combine(combined_multi_label)
                 combined_multi_label = combined_multi_label.combine(object_label)
@@ -155,7 +179,6 @@ class ASTProcessor:
             return combined_multi_label
 
         elif node['type'] == 'UnaryExpression':
-            print(f"Processing UnaryExpression: {node}")
             return self.process_expression_node(node['argument'])
 
         elif node['type'] == 'MemberExpression':
@@ -177,9 +200,7 @@ class ASTProcessor:
                 left = node['left']['name']
 
             if node['right']['type'] == 'Literal' and node['left']['type'] == "MemberExpression":
-                print("Initialized member expression with literal")
                 multilabel = MultiLabel(self.policy.get_patterns())
-                print(f"Property label {self.multilabelling.get_multilabel(node['left']['property']['name'])}")
                 self.multilabelling.update_multilabel(node['left']['property']['name'], multilabel)
                 return multilabel
 
@@ -189,16 +210,11 @@ class ASTProcessor:
             if value_label:
                 # Update the multilabel for the left-hand side
                 self.multilabelling.update_multilabel(left, value_label)
-                print(f"Updated multilabel for {left}: {value_label}")
-
                 self._process_sinks(value_label, left, node)
             else:
                 # Handle uninitialized assignments (empty MultiLabel)
-                print(f"Right-hand side of {left} is uninitialized.")
                 multilabel = MultiLabel(self.policy.get_patterns())
                 self.multilabelling.update_multilabel(left, multilabel)
-                print(f"Initialized empty MultiLabel for {left}")
-
                 self._process_sinks(multilabel, left, node)
 
             if node['left']['type'] == 'MemberExpression':
@@ -208,28 +224,28 @@ class ASTProcessor:
 
             return value_label
         else:
-            print(f"Unhandled expression node type: {node['type']}")
             return MultiLabel(self.policy.get_patterns())
         
             
     def process_statement_node(self, node, max_while_iterations=3) -> MultiLabel:
         """
-        Processes a single AST statement node and returns a MultiLabel representing its flows.
+        Description: Processes a single AST statement node and returns a MultiLabel representing its flows.
+        Variables:
+            - node (dict): The AST node representing the statement to process.
+            - max_while_iterations (int): The maximum number of iterations to process for while loops.
+        Result: A MultiLabel object containing the security labels for the statement.
         """
         if node['type'] == 'ExpressionStatement':
-            print(f"Processing ExpressionStatement: {node}")
             stmt_label = self.process_expression_node(node['expression'])
 
             # Update multilabelling and process sinks
             for var_name, multilabel in stmt_label.mapping.items():
-                print(f"Updating multilabelling for variable: {var_name}")
                 self.multilabelling.update_multilabel(var_name, multilabel)
                 self._process_sinks(multilabel, var_name, node)
 
             return stmt_label
 
         elif node['type'] == 'BlockStatement':
-            print(f"Processing BlockStatement: {node}")
             combined_label = MultiLabel(self.policy.get_patterns())
 
             # Process each statement in the block sequentially
@@ -239,28 +255,22 @@ class ASTProcessor:
 
             # Update multilabelling and process sinks for combined labels
             for var_name, multilabel in combined_label.mapping.items():
-                print(f"Updating multilabelling for block variable: {var_name}")
                 self.multilabelling.update_multilabel(var_name, multilabel)
                 self._process_sinks(multilabel, var_name, node)
 
             return combined_label
 
         elif node['type'] == 'IfStatement':
-            print(f"Processing IfStatement: {node}")
             consequent_label = self.process_statement_node(node['consequent'])
-            print(f"Consequent label for IfStatement: {consequent_label}")
 
             alternate_label = MultiLabel(self.policy.get_patterns())
             if node.get('alternate'):
                 alternate_label = self.process_statement_node(node['alternate'])
-                print(f"Alternate label for IfStatement: {alternate_label}")
 
             combined_label = consequent_label.combine(alternate_label)
-            print(f"Combined label after IfStatement branches: {combined_label}")
 
             # Ensure shared variables like `a` and `c` are fully updated
             for var_name, multilabel in combined_label.mapping.items():
-                print(f"Updating multilabelling for IfStatement variable: {var_name}")
                 self.multilabelling.update_multilabel(var_name, multilabel)
                 self._process_sinks(multilabel, var_name, node)
 
@@ -268,39 +278,31 @@ class ASTProcessor:
 
 
         elif node['type'] == 'WhileStatement':
-            print(f"Processing WhileStatement: {node}")
             loop_label = MultiLabel(self.policy.get_patterns())
 
             # Process the loop body for a fixed number of iterations
             for iteration in range(max_while_iterations):
-                print(f"Iteration {iteration + 1} of WhileStatement processing")
                 loop_body_label = self.process_statement_node(node['body'])
                 loop_label = loop_label.combine(loop_body_label)
 
             # Update multilabelling and process sinks for loop variables
             for var_name, multilabel in loop_label.mapping.items():
-                print(f"Updating multilabelling for WhileStatement variable: {var_name}")
                 self.multilabelling.update_multilabel(var_name, multilabel)
                 self._process_sinks(multilabel, var_name, node)
 
             return loop_label
 
         else:
-            print(f"Unhandled statement type: {node['type']}")
             return MultiLabel(self.policy.get_patterns())
-
-
-
 
 
     def traverse_ast(self, ast):
         """
-        Traverse the AST and process each statement using process_statement_node.
+        Description: Traverse the AST and process each statement using process_statement_node.
+        Variables:
+            - ast (dict): The AST to traverse.
         """
-        print(f"Starting AST traversal for: {ast}")
-
         for stmt in ast['body']:
-            print(f"Visiting statement: {stmt}")
             stmt_label = self.process_statement_node(stmt)
 
             # Update the global multilabelling
@@ -308,28 +310,11 @@ class ASTProcessor:
                 self.multilabelling.update_multilabel(var_name, multilabel)
 
 
-
-
-    def traverse_ast_printer(self, node, indent_level=0):
-        indent = '  ' * indent_level
-
-        if isinstance(node, dict) and 'type' in node:
-            node_type = node.get('type', 'Unknown')
-            line = node.get('loc', {}).get('start', {}).get('line', 'Unknown')
-
-            print(f"{indent}Node Type: {node_type}, Line: {line}")
-
-            for key, value in node.items():
-                if isinstance(value, (dict, list)):
-                    self.traverse_ast_printer(value, indent_level + 1)
-
-        elif isinstance(node, list):
-            for child in node:
-                self.traverse_ast_printer(child, indent_level + 1)
-
     def get_sorted_vulnerabilities(self):
         """
-        Returns the vulnerabilities sorted alphabetically by their vulnerability name.
+        Description: Returns the vulnerabilities sorted alphabetically by their vulnerability name.
+        Variables: None
+        Result: A list of sorted vulnerabilities.
         """
         vulnerabilities = self.vulnerabilities.get_illegal_flows()
 
