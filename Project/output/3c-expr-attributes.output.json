@@ -16,7 +16,7 @@
     {
         "vulnerability": "A_2",
         "source": [
-            "b",
+            "m",
             2
         ],
         "sink": [
@@ -30,7 +30,7 @@
     {
         "vulnerability": "A_3",
         "source": [
-            "m",
+            "b",
             2
         ],
         "sink": [

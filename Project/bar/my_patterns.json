@@ -35,6 +35,13 @@
         "implicit": "no"
     },
     {
+        "vulnerability": "Path Traversal",
+        "sources": ["req.query.file", "req.params.filename"],
+        "sanitizers": ["path.normalize", "validatePath"],
+        "sinks": ["fs.readFile", "fs.createReadStream", "require"],
+        "implicit": "no"
+      },
+    {
         "vulnerability": "Insecure Deserialization",
         "sources": ["req.body", "req.query", "req.params"],
         "sanitizers": ["safeParse", "JSON.parseSafe"],

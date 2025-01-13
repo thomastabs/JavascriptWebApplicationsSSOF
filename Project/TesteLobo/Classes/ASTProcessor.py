@@ -49,13 +49,16 @@ class ASTProcessor:
                         function_name, node['loc']['start']['line'], source
                     )
 
-    def _process_sinks(self, combined_multi_label, function_name, node):
-        for pattern in self.policy.get_patterns():
-            if pattern.has_sink(function_name):
-                for source, source_line in combined_multi_label.get_label(pattern).get_sources():
-                    flows = combined_multi_label.get_label(pattern).get_flows_from_source(source)
 
-                    # Determine unsanitized and sanitized flows
+    def _process_sinks(self, combined_multi_label, var_name, node):
+        print(f"Processing sinks for variable: {var_name} at line {node['loc']['start']['line']}")
+        for pattern in self.policy.get_patterns():
+            if pattern.has_sink(var_name):
+                for source, source_line in combined_multi_label.get_label(pattern).get_sources():
+                    print(f"Checking source '{source}' for sink '{var_name}'")
+                    flows = combined_multi_label.get_label(pattern).get_flows_from_source(source)
+                    print(f"Flows for source '{source}': {flows}")
+
                     unsanitized = any(
                         not any(sanitizer[0] in pattern.sanitizers for sanitizer in flow.flow)
                         for flow in flows
@@ -70,14 +73,15 @@ class ASTProcessor:
                         f"{pattern.get_vulnerability()}_{count}",
                         source,
                         source_line,
-                        function_name,
+                        var_name,
                         node['loc']['start']['line'],
                         unsanitized,
                         sanitized_flows,
-                        False  # Implicit flows are not considered here
+                        False
                     )
                     self.vulnerabilities.add_illegal_flow(illegal_flow)
                     print(f"Recorded illegal flow: {illegal_flow}")
+
 
     def process_expression_node(self, node) -> MultiLabel:
         if node['type'] == 'Identifier':
@@ -205,65 +209,106 @@ class ASTProcessor:
             return value_label
         else:
             print(f"Unhandled expression node type: {node['type']}")
-            return MultiLabel()
-
-
-    def process_statement_node(self, node, max_while_iterations=3) -> MultiLabelling:
+            return MultiLabel(self.policy.get_patterns())
+        
+            
+    def process_statement_node(self, node, max_while_iterations=3) -> MultiLabel:
+        """
+        Processes a single AST statement node and returns a MultiLabel representing its flows.
+        """
         if node['type'] == 'ExpressionStatement':
-            self.process_expression_node(node['expression'])
-            return self.multilabelling
+            print(f"Processing ExpressionStatement: {node}")
+            stmt_label = self.process_expression_node(node['expression'])
+
+            # Update multilabelling and process sinks
+            for var_name, multilabel in stmt_label.mapping.items():
+                print(f"Updating multilabelling for variable: {var_name}")
+                self.multilabelling.update_multilabel(var_name, multilabel)
+                self._process_sinks(multilabel, var_name, node)
+
+            return stmt_label
 
         elif node['type'] == 'BlockStatement':
+            print(f"Processing BlockStatement: {node}")
+            combined_label = MultiLabel(self.policy.get_patterns())
+
+            # Process each statement in the block sequentially
             for stmt in node['body']:
-                self.multilabelling = self.process_statement_node(stmt)
-            return self.multilabelling
+                stmt_label = self.process_statement_node(stmt)
+                combined_label = combined_label.combine(stmt_label)
+
+            # Update multilabelling and process sinks for combined labels
+            for var_name, multilabel in combined_label.mapping.items():
+                print(f"Updating multilabelling for block variable: {var_name}")
+                self.multilabelling.update_multilabel(var_name, multilabel)
+                self._process_sinks(multilabel, var_name, node)
+
+            return combined_label
 
         elif node['type'] == 'IfStatement':
-            consequent = self.process_statement_node(node['consequent'])
-            alternate = self.multilabelling
+            print(f"Processing IfStatement: {node}")
+            consequent_label = self.process_statement_node(node['consequent'])
+            print(f"Consequent label for IfStatement: {consequent_label}")
+
+            alternate_label = MultiLabel(self.policy.get_patterns())
             if node.get('alternate'):
-                alternate = self.process_statement_node(node['alternate'])
-            return consequent.combine(alternate)
+                alternate_label = self.process_statement_node(node['alternate'])
+                print(f"Alternate label for IfStatement: {alternate_label}")
+
+            combined_label = consequent_label.combine(alternate_label)
+            print(f"Combined label after IfStatement branches: {combined_label}")
+
+            # Ensure shared variables like `a` and `c` are fully updated
+            for var_name, multilabel in combined_label.mapping.items():
+                print(f"Updating multilabelling for IfStatement variable: {var_name}")
+                self.multilabelling.update_multilabel(var_name, multilabel)
+                self._process_sinks(multilabel, var_name, node)
+
+            return combined_label
+
 
         elif node['type'] == 'WhileStatement':
-            loop_label = self.multilabelling.deep_copy()
+            print(f"Processing WhileStatement: {node}")
+            loop_label = MultiLabel(self.policy.get_patterns())
+
+            # Process the loop body for a fixed number of iterations
             for iteration in range(max_while_iterations):
+                print(f"Iteration {iteration + 1} of WhileStatement processing")
                 loop_body_label = self.process_statement_node(node['body'])
                 loop_label = loop_label.combine(loop_body_label)
-            self.multilabelling = self.multilabelling.combine(loop_label)
-            return self.multilabelling
+
+            # Update multilabelling and process sinks for loop variables
+            for var_name, multilabel in loop_label.mapping.items():
+                print(f"Updating multilabelling for WhileStatement variable: {var_name}")
+                self.multilabelling.update_multilabel(var_name, multilabel)
+                self._process_sinks(multilabel, var_name, node)
+
+            return loop_label
 
         else:
             print(f"Unhandled statement type: {node['type']}")
-            return self.multilabelling
+            return MultiLabel(self.policy.get_patterns())
+
+
+
 
 
     def traverse_ast(self, ast):
         """
-        Traverse the AST and process each statement.
+        Traverse the AST and process each statement using process_statement_node.
         """
         print(f"Starting AST traversal for: {ast}")
 
         for stmt in ast['body']:
             print(f"Visiting statement: {stmt}")
-            if stmt['type'] == 'ExpressionStatement':
-                self.process_expression_node(stmt['expression'])
-                print(f"Processed ExpressionStatement: {stmt}")
-            elif stmt['type'] == 'VariableDeclaration':
-                for declaration in stmt['declarations']:
-                    print(f"Processing VariableDeclaration: {declaration}")
-                    if declaration['init']:
-                        init_label = self.process_expression_node(declaration['init'])
-                        variable_name = declaration['id']['name']
-                        self.multilabelling.update_multilabel(variable_name, init_label)
-                        print(f"Assigned label to variable '{variable_name}': {init_label}")
-            elif stmt['type'] == 'AssignmentExpression':
-                print(f"Processing AssignmentExpression: {stmt}")
-                self.process_expression_node(stmt)
-            elif stmt['type'] in {'BlockStatement', 'IfStatement', 'WhileStatement', 'ExpressionStatement'}:
-                self.multilabelling = self.process_statement_node(stmt)
-            else:
-                print(f"Unhandled statement type: {stmt['type']}")
+            stmt_label = self.process_statement_node(stmt)
+
+            # Update the global multilabelling
+            for var_name, multilabel in stmt_label.mapping.items():
+                self.multilabelling.update_multilabel(var_name, multilabel)
+
+
+
 
     def traverse_ast_printer(self, node, indent_level=0):
         indent = '  ' * indent_level

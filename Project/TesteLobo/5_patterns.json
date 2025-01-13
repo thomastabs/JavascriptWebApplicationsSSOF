@@ -1,0 +1,38 @@
+[
+    {
+      "vulnerability": "Command Injection",
+      "sources": ["req.headers", "readFile"],
+      "sanitizers": ["shell-escape"],
+      "sinks": ["exec", "execSync", "spawnSync", "execFileSync"],
+      "implicit": "no"
+    },
+    {
+      "vulnerability": "DOM XSS",
+      "sources": ["document.referrer", "document.URL", "document.location"],
+      "sanitizers": ["DOMPurify.sanitize"],
+      "sinks": ["document.write", "innerHTML", "setAttribute"],
+      "implicit": "yes"
+    },
+    {
+      "vulnerability": "SQL Injection",
+      "sources": ["req.query", "req.body", "req.params"],
+      "sanitizers": ["escape", "parameterize"],
+      "sinks": ["db.query", "db.execute", "sequelize.query"],
+      "implicit": "yes"
+    },
+    {
+        "vulnerability": "CSRF",
+        "sources": ["req.cookies", "req.headers.csrfToken"],
+        "sanitizers": ["csrfTokenValidation", "validateOrigin"],
+        "sinks": ["db.update", "db.delete", "res.json", "res.redirect"],
+        "implicit": "no"
+    },
+    {
+        "vulnerability": "Path Traversal",
+        "sources": ["req.query", "req.body", "req.params", "req.headers"],
+        "sanitizers": ["path.normalize", "sanitizePath"],
+        "sinks": ["fs.readFile", "fs.readFileSync", "fs.createReadStream"],
+        "implicit": "no"
+    }
+]
+  
